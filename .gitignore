@@ -1,0 +1,80 @@
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.backup
+.env.production
+
+# Laravel (api/)
+api/vendor/
+api/node_modules/
+api/.env
+api/.env.backup
+api/.env.production
+api/storage/*.key
+api/public/storage
+api/public/hot
+api/.phpunit.result.cache
+api/Homestead.json
+api/Homestead.yaml
+api/auth.json
+api/npm-debug.log
+api/yarn-error.log
+
+# Next.js (web/)
+web/node_modules/
+web/.next/
+web/out/
+web/build
+web/.vercel
+web/*.tsbuildinfo
+web/next-env.d.ts
+web/public/sw.js
+web/public/workbox-*.js
+web/public/worker-*.js
+web/public/sw.js.map
+web/public/workbox-*.js.map
+web/public/worker-*.js.map
+
+# Flutter (mobile/)
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/.pub-cache/
+mobile/.pub/
+mobile/build/
+mobile/.ios/
+mobile/.android/
+
+# Logs
+*.log
+logs/
+api/storage/logs/*.log
+
+# Cache
+.cache/
+*.cache
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
