@@ -1,28 +1,10 @@
 import axios from 'axios'
-
-// Auto-detect API URL based on environment (runtime detection)
-const getApiUrl = (): string => {
-  // Auto-detect production based on hostname (client-side only)
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname
-    // If not localhost, use production API
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.startsWith('192.168.')) {
-      return 'https://api.websi.vn/api'
-    }
-  }
-  
-  // If environment variable is set (build time), use it
-  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL
-  }
-  
-  // Default to localhost for development
-  return 'http://localhost:8000/api'
-}
+import { getApiUrl } from './config'
 
 // Create axios instance with dynamic baseURL
+// baseURL sẽ được set lại trong interceptor để đảm bảo luôn đúng
 const api = axios.create({
-  baseURL: getApiUrl(),
+  baseURL: 'https://api.websi.vn/api', // Default to production, sẽ được override trong interceptor
   headers: {
     'Content-Type': 'application/json',
   },
@@ -33,7 +15,14 @@ api.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
       // Re-evaluate API URL on each request to ensure it's always correct
-      config.baseURL = getApiUrl()
+      // Điều này đảm bảo API URL luôn được detect đúng dựa trên hostname hiện tại
+      const apiUrl = getApiUrl()
+      config.baseURL = apiUrl
+      
+      // Debug log (chỉ trong development)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('API URL:', apiUrl)
+      }
       
       const token = localStorage.getItem('token')
       if (token) {
