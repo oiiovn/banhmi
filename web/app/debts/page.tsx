@@ -761,7 +761,7 @@ export default function CustomerDebtsPage() {
                               // Single order debt (old data)
                               <tr 
                                 className="hover:bg-gray-50 cursor-pointer"
-                                onClick={() => handleViewOrder(selectedDebt.order_id, selectedDebt.id)}
+                                onClick={() => selectedDebt.order_id && handleViewOrder(selectedDebt.order_id, selectedDebt.id)}
                               >
                                 <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
                                   {formatOrderId(selectedDebt.order_id)}
@@ -857,7 +857,7 @@ export default function CustomerDebtsPage() {
                                     ? 'bg-yellow-100 border-l-4 border-yellow-500 shadow-md' 
                                     : ''
                                 }`}
-                                onClick={() => router.push(`/payments/${payment.id}`)}
+                                onClick={() => router.push(`/payments?id=${payment.id}`)}
                               >
                                 <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                                   {payment.created_at

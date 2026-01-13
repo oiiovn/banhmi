@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/store/authStore'
 import { customerApi } from '@/lib/api/customer'
 import { Payment } from '@/lib/api/agent'
@@ -26,9 +26,10 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   other: 'Khác',
 }
 
-export default function PaymentDetailPage() {
+export default function PaymentDetailClient() {
   const router = useRouter()
-  const params = useParams()
+  const searchParams = useSearchParams()
+  const paymentId = searchParams.get('id') || ''
   const { user, isAuthenticated } = useAuthStore()
   const [payment, setPayment] = useState<Payment | null>(null)
   const [loading, setLoading] = useState(true)
@@ -64,14 +65,19 @@ export default function PaymentDetailPage() {
       return
     }
 
+    if (!paymentId) {
+      router.push('/debts')
+      return
+    }
+
     fetchPaymentDetails()
-  }, [isHydrated, isAuthenticated, user, params.id])
+  }, [isHydrated, isAuthenticated, user, paymentId])
 
   const fetchPaymentDetails = async () => {
     try {
       setLoading(true)
-      const paymentId = parseInt(params.id as string, 10)
-      if (isNaN(paymentId)) {
+      const id = parseInt(paymentId, 10)
+      if (isNaN(id)) {
         setModal({
           isOpen: true,
           type: 'alert',
@@ -82,7 +88,7 @@ export default function PaymentDetailPage() {
         return
       }
 
-      const response = await customerApi.getPayment(paymentId)
+      const response = await customerApi.getPayment(id)
       if (response.success) {
         setPayment(response.data)
       } else {

@@ -741,7 +741,7 @@ export default function AgentDebtsPage() {
                               <tr 
                                 key={payment.id}
                                 className="hover:bg-gray-50 cursor-pointer"
-                                onClick={() => router.push(`/payments/${payment.id}`)}
+                                onClick={() => router.push(`/payments?id=${payment.id}`)}
                               >
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                                   {formatDate(payment.payment_date)}

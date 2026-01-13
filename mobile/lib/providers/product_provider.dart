@@ -13,7 +13,11 @@ class ProductProvider with ChangeNotifier {
   List<Category> get categories => _categories;
   bool get isLoading => _isLoading;
 
-  static const String baseUrl = 'http://localhost:8000/api';
+  // Production API URL
+  static const String baseUrl = 'https://api.websi.vn/api';
+  
+  // Development (uncomment to use localhost)
+  // static const String baseUrl = 'http://localhost:8000/api';
 
   Future<void> fetchCategories() async {
     try {

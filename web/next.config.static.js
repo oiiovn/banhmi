@@ -1,3 +1,6 @@
+// File này dùng cho static export (shared hosting không có Node.js)
+// Copy nội dung này vào next.config.js và uncomment output: 'export'
+
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
@@ -8,8 +11,7 @@ const withPWA = require('next-pwa')({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Static export cho LiteSpeed hosting (không cần Node.js)
-  output: 'export',
+  output: 'export', // Static export cho shared hosting
   images: {
     unoptimized: true, // Cần cho static export
     domains: [
@@ -19,7 +21,6 @@ const nextConfig = {
         : [])
     ],
   },
-  trailingSlash: true, // Giúp routing tốt hơn với static export
 }
 
 module.exports = withPWA(nextConfig)

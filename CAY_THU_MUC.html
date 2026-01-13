@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cây Thư Mục Dự Án Banhmi - Chi Tiết</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            transition: transform 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+        }
+        
+        .section-title {
+            font-size: 1.8em;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #667eea;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .tree {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.8;
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 10px;
+            overflow-x: auto;
+            border: 1px solid #e9ecef;
+        }
+        
+        .folder {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+        
+        .file-php {
+            color: #4dabf7;
+        }
+        
+        .file-tsx, .file-ts {
+            color: #51cf66;
+        }
+        
+        .file-dart {
+            color: #339af0;
+        }
+        
+        .file-json {
+            color: #ffd43b;
+        }
+        
+        .file-md {
+            color: #ff8787;
+        }
+        
+        .file-config {
+            color: #845ef7;
+        }
+        
+        .file-other {
+            color: #868e96;
+        }
+        
+        .detail-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .detail-box h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .detail-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .detail-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .detail-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .badge-php {
+            background: #4dabf7;
+            color: white;
+        }
+        
+        .badge-tsx {
+            background: #51cf66;
+            color: white;
+        }
+        
+        .badge-dart {
+            background: #339af0;
+            color: white;
+        }
+        
+        .badge-route {
+            background: #ffd43b;
+            color: #333;
+        }
+        
+        .route-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .route-item {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .route-method {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 8px;
+            font-size: 0.85em;
+        }
+        
+        .method-get {
+            background: #51cf66;
+            color: white;
+        }
+        
+        .method-post {
+            background: #4dabf7;
+            color: white;
+        }
+        
+        .method-put {
+            background: #ffd43b;
+            color: #333;
+        }
+        
+        .method-delete {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            font-size: 1em;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .tab:hover {
+            color: #667eea;
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            font-weight: bold;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .deploy-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+        
+        .deploy-section h2 {
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+        
+        .deploy-step {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .deploy-step h3 {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        
+        .code-block {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍞 Cây Thư Mục Dự Án Banhmi</h1>
+        <p class="subtitle">Ứng dụng đặt hàng bánh mì - Full Stack Project | Chi Tiết Đầy Đủ</p>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number">3</div>
+                <div class="stat-label">Phần chính</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">9</div>
+                <div class="stat-label">Models</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">8</div>
+                <div class="stat-label">Controllers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">19</div>
+                <div class="stat-label">Pages (Web)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">28</div>
+                <div class="stat-label">Migrations</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">128</div>
+                <div class="stat-label">Files Code</div>
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('structure')">Cấu Trúc</button>
+            <button class="tab" onclick="showTab('api')">API Routes</button>
+            <button class="tab" onclick="showTab('controllers')">Controllers</button>
+            <button class="tab" onclick="showTab('models')">Models</button>
+            <button class="tab" onclick="showTab('pages')">Pages</button>
+            <button class="tab" onclick="showTab('deploy')">Deploy</button>
+        </div>
+        
+        <!-- Tab: Cấu Trúc -->
+        <div id="structure" class="tab-content active">
+            <div class="section">
+                <h2 class="section-title">📁 Cấu Trúc Thư Mục Chi Tiết</h2>
+                <div class="tree">
+<pre>
+banhmi/
+│
+├── 📁 <span class="folder">api/</span>                          # Laravel 10 API Backend
+│   ├── 📁 <span class="folder">app/</span>
+│   │   ├── 📁 <span class="folder">Console/</span>
+│   │   │   ├── 📁 <span class="folder">Commands/</span>
+│   │   │   └── <span class="file-php">Kernel.php</span>
+│   │   ├── 📁 <span class="folder">Exceptions/</span>
+│   │   │   └── <span class="file-php">Handler.php</span>
+│   │   ├── 📁 <span class="folder">Http/</span>
+│   │   │   ├── 📁 <span class="folder">Controllers/</span>
+│   │   │   │   ├── <span class="file-php">Controller.php</span>
+│   │   │   │   ├── <span class="file-php">AdminController.php</span>
+│   │   │   │   ├── <span class="file-php">AgentController.php</span>
+│   │   │   │   ├── <span class="file-php">AuthController.php</span>
+│   │   │   │   ├── <span class="file-php">CategoryController.php</span>
+│   │   │   │   ├── <span class="file-php">DebtController.php</span>
+│   │   │   │   ├── <span class="file-php">OrderController.php</span>
+│   │   │   │   ├── <span class="file-php">PaymentController.php</span>
+│   │   │   │   └── <span class="file-php">ProductController.php</span>
+│   │   │   ├── <span class="file-php">Kernel.php</span>
+│   │   │   └── 📁 <span class="folder">Middleware/</span>       # 11 middleware files
+│   │   ├── 📁 <span class="folder">Models/</span>
+│   │   │   ├── <span class="file-php">Category.php</span>
+│   │   │   ├── <span class="file-php">Debt.php</span>
+│   │   │   ├── <span class="file-php">DebtOrder.php</span>
+│   │   │   ├── <span class="file-php">Order.php</span>
+│   │   │   ├── <span class="file-php">OrderAuditLog.php</span>
+│   │   │   ├── <span class="file-php">OrderItem.php</span>
+│   │   │   ├── <span class="file-php">Payment.php</span>
+│   │   │   ├── <span class="file-php">Product.php</span>
+│   │   │   └── <span class="file-php">User.php</span>
+│   │   └── 📁 <span class="folder">Providers/</span>
+│   │       ├── <span class="file-php">AppServiceProvider.php</span>
+│   │       ├── <span class="file-php">AuthServiceProvider.php</span>
+│   │       └── <span class="file-php">RouteServiceProvider.php</span>
+│   ├── 📁 <span class="folder">bootstrap/</span>
+│   │   ├── <span class="file-php">app.php</span>
+│   │   └── 📁 <span class="folder">cache/</span>
+│   ├── 📁 <span class="folder">config/</span>                   # 12 config files
+│   │   ├── <span class="file-config">app.php</span>
+│   │   ├── <span class="file-config">auth.php</span>
+│   │   ├── <span class="file-config">cache.php</span>
+│   │   ├── <span class="file-config">cors.php</span>           # ⚠️ Cần cấu hình khi deploy
+│   │   ├── <span class="file-config">database.php</span>
+│   │   ├── <span class="file-config">filesystems.php</span>
+│   │   ├── <span class="file-config">logging.php</span>
+│   │   ├── <span class="file-config">mail.php</span>
+│   │   ├── <span class="file-config">queue.php</span>
+│   │   ├── <span class="file-config">sanctum.php</span>
+│   │   ├── <span class="file-config">services.php</span>
+│   │   ├── <span class="file-config">session.php</span>
+│   │   └── <span class="file-config">view.php</span>
+│   ├── 📁 <span class="folder">database/</span>
+│   │   ├── 📁 <span class="folder">migrations/</span>           # 28 migration files
+│   │   └── 📁 <span class="folder">seeders/</span>
+│   │       ├── <span class="file-php">AdminSeeder.php</span>
+│   │       └── <span class="file-php">DatabaseSeeder.php</span>
+│   ├── 📁 <span class="folder">public/</span>
+│   │   ├── <span class="file-php">index.php</span>              # Entry point
+│   │   └── storage
+│   ├── 📁 <span class="folder">routes/</span>
+│   │   ├── <span class="file-php">api.php</span>                # API routes
+│   │   ├── <span class="file-php">console.php</span>
+│   │   └── <span class="file-php">web.php</span>
+│   ├── 📁 <span class="folder">storage/</span>
+│   │   ├── 📁 <span class="folder">app/</span>
+│   │   ├── 📁 <span class="folder">framework/</span>
+│   │   └── 📁 <span class="folder">logs/</span>
+│   ├── 📁 <span class="folder">vendor/</span>                   # Composer dependencies
+│   ├── <span class="file-other">artisan</span>
+│   ├── <span class="file-json">composer.json</span>
+│   ├── <span class="file-other">composer.lock</span>
+│   └── <span class="file-md">README.md</span>
+│
+├── 📁 <span class="folder">web/</span>                          # Next.js 14 Web Frontend
+│   ├── 📁 <span class="folder">app/</span>                      # Next.js App Router
+│   │   ├── 📁 <span class="folder">admin/</span>
+│   │   │   ├── 📁 <span class="folder">agents/</span>
+│   │   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   │   ├── 📁 <span class="folder">customers/</span>
+│   │   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   ├── 📁 <span class="folder">agent/</span>
+│   │   │   ├── 📁 <span class="folder">debts/</span>
+│   │   │   │   ├── <span class="file-tsx">error.tsx</span>
+│   │   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   │   ├── 📁 <span class="folder">orders/</span>
+│   │   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   │   ├── 📁 <span class="folder">products/</span>
+│   │   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   ├── 📁 <span class="folder">cart/</span>
+│   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   ├── 📁 <span class="folder">checkout/</span>
+│   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   ├── 📁 <span class="folder">debts/</span>
+│   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   ├── 📁 <span class="folder">login/</span>
+│   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   ├── 📁 <span class="folder">orders/</span>
+│   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   ├── 📁 <span class="folder">payments/</span>
+│   │   │   └── 📁 <span class="folder">[id]/</span>
+│   │   │       └── <span class="file-tsx">page.tsx</span>
+│   │   ├── 📁 <span class="folder">register/</span>
+│   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   ├── 📁 <span class="folder">register-agent/</span>
+│   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   ├── 📁 <span class="folder">refresh-user/</span>
+│   │   │   └── <span class="file-tsx">page.tsx</span>
+│   │   ├── <span class="file-other">globals.css</span>
+│   │   ├── <span class="file-tsx">layout.tsx</span>
+│   │   └── <span class="file-tsx">page.tsx</span>
+│   ├── 📁 <span class="folder">components/</span>
+│   │   ├── <span class="file-tsx">AgentHeader.tsx</span>
+│   │   ├── <span class="file-tsx">BottomNav.tsx</span>
+│   │   ├── <span class="file-tsx">CustomerHeader.tsx</span>
+│   │   └── <span class="file-tsx">Modal.tsx</span>
+│   ├── 📁 <span class="folder">lib/</span>
+│   │   ├── 📁 <span class="folder">api/</span>
+│   │   │   ├── <span class="file-ts">admin.ts</span>
+│   │   │   ├── <span class="file-ts">agent.ts</span>
+│   │   │   ├── <span class="file-ts">auth.ts</span>
+│   │   │   └── <span class="file-ts">customer.ts</span>
+│   │   ├── 📁 <span class="folder">store/</span>
+│   │   │   ├── <span class="file-ts">authStore.ts</span>
+│   │   │   ├── <span class="file-ts">cartStore.ts</span>
+│   │   │   └── <span class="file-ts">orderNotificationStore.ts</span>
+│   │   └── <span class="file-ts">api.ts</span>
+│   ├── 📁 <span class="folder">public/</span>
+│   │   ├── icon-192x192.svg
+│   │   ├── icon-512x512.svg
+│   │   ├── <span class="file-json">manifest.json</span>
+│   │   ├── sw.js
+│   │   ├── workbox-4754cb34.js
+│   │   ├── create-icons.html
+│   │   └── PWA_SETUP.md
+│   ├── 📁 <span class="folder">scripts/</span>
+│   │   └── <span class="file-other">create-icons.js</span>
+│   ├── 📁 <span class="folder">node_modules/</span>            # npm dependencies
+│   ├── <span class="file-config">next.config.js</span>
+│   ├── <span class="file-json">package.json</span>
+│   ├── <span class="file-other">package-lock.json</span>
+│   ├── <span class="file-config">postcss.config.js</span>
+│   ├── <span class="file-config">tailwind.config.js</span>
+│   ├── <span class="file-config">tsconfig.json</span>
+│   ├── <span class="file-other">next-env.d.ts</span>
+│   ├── <span class="file-md">README.md</span>
+│   └── <span class="file-md">TEST_AUTH.md</span>
+│
+├── 📁 <span class="folder">mobile/</span>                       # Flutter Mobile App
+│   ├── 📁 <span class="folder">lib/</span>
+│   │   ├── 📁 <span class="folder">models/</span>
+│   │   │   ├── <span class="file-dart">category.dart</span>
+│   │   │   └── <span class="file-dart">product.dart</span>
+│   │   ├── 📁 <span class="folder">providers/</span>
+│   │   │   ├── <span class="file-dart">auth_provider.dart</span>
+│   │   │   └── <span class="file-dart">product_provider.dart</span>
+│   │   ├── 📁 <span class="folder">screens/</span>
+│   │   │   └── <span class="file-dart">home_screen.dart</span>
+│   │   └── <span class="file-dart">main.dart</span>
+│   ├── <span class="file-config">analysis_options.yaml</span>
+│   ├── <span class="file-config">pubspec.yaml</span>
+│   └── <span class="file-md">README.md</span>
+│
+├── 📄 <span class="file-other">.gitignore</span>
+├── 📄 <span class="file-md">README.md</span>
+├── 📄 <span class="file-other">start.sh</span>
+├── 📄 <span class="file-md">HUONG_DAN_CHAY.md</span>
+├── 📄 <span class="file-md">HUONG_DAN_DANG_KY_DAI_LY.md</span>
+├── 📄 <span class="file-md">FIX_NETWORK_ERROR.md</span>
+├── 📄 <span class="file-md">FIX_RATE_LIMIT.md</span>
+└── 📄 <span class="file-md">TRANG_THAI.md</span>
+</pre>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab: API Routes -->
+        <div id="api" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">🔌 API Routes Chi Tiết</h2>
+                
+                <div class="detail-box">
+                    <h3>🌐 Public Routes (Không cần authentication)</h3>
+                    <div class="route-list">
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/register</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/login</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/categories</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/categories/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/products</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/products/{id}</code>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="detail-box">
+                    <h3>👤 Customer Routes (auth:sanctum)</h3>
+                    <div class="route-list">
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/logout</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/user</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/orders</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/orders</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/orders/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/orders/{id}/confirm-received</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/debts</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/debts/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/payments</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/payments</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/payments/{id}</code>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="detail-box">
+                    <h3>👑 Admin Routes (auth:sanctum + admin)</h3>
+                    <div class="route-list">
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/admin/dashboard</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/admin/agents</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/admin/agents</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-put">PUT</span>
+                            <code>/api/admin/agents/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-delete">DELETE</span>
+                            <code>/api/admin/agents/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/admin/customers</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/admin/customers/{id}/upgrade-to-agent</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/admin/orders</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-put">PUT</span>
+                            <code>/api/admin/orders/{id}/status</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/admin/products</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/admin/products</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-put">PUT</span>
+                            <code>/api/admin/products/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-delete">DELETE</span>
+                            <code>/api/admin/products/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/admin/categories</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-put">PUT</span>
+                            <code>/api/admin/categories/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-delete">DELETE</span>
+                            <code>/api/admin/categories/{id}</code>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="detail-box">
+                    <h3>🏪 Agent Routes (auth:sanctum + agent)</h3>
+                    <div class="route-list">
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/agent/dashboard</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/agent/orders</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/agent/orders/pending</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/agent/orders/pending/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/agent/orders/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-put">PUT</span>
+                            <code>/api/agent/orders/{id}/edit</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/agent/orders/{id}/accept</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-put">PUT</span>
+                            <code>/api/agent/orders/{id}/status</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/agent/products</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/agent/products</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-put">PUT</span>
+                            <code>/api/agent/products/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-delete">DELETE</span>
+                            <code>/api/agent/products/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/agent/categories</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/agent/categories</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-put">PUT</span>
+                            <code>/api/agent/categories/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-delete">DELETE</span>
+                            <code>/api/agent/categories/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/agent/debts</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/agent/debts/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-put">PUT</span>
+                            <code>/api/agent/debts/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/agent/payments</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/agent/payments/pending</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/agent/payments</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-get">GET</span>
+                            <code>/api/agent/payments/{id}</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/agent/payments/{id}/confirm</code>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-method method-post">POST</span>
+                            <code>/api/agent/payments/{id}/reject</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab: Controllers -->
+        <div id="controllers" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">🎮 Controllers (8 files)</h2>
+                <div class="detail-box">
+                    <ul class="detail-list">
+                        <li><span class="file-php">Controller.php</span> - Base controller</li>
+                        <li><span class="file-php">AdminController.php</span> - Quản lý toàn bộ hệ thống</li>
+                        <li><span class="file-php">AgentController.php</span> - Quản lý đơn hàng, sản phẩm của đại lý</li>
+                        <li><span class="file-php">AuthController.php</span> - Đăng ký, đăng nhập, logout</li>
+                        <li><span class="file-php">CategoryController.php</span> - Quản lý danh mục</li>
+                        <li><span class="file-php">DebtController.php</span> - Quản lý công nợ</li>
+                        <li><span class="file-php">OrderController.php</span> - Quản lý đơn hàng</li>
+                        <li><span class="file-php">PaymentController.php</span> - Quản lý thanh toán</li>
+                        <li><span class="file-php">ProductController.php</span> - Quản lý sản phẩm</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab: Models -->
+        <div id="models" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">📦 Models (9 models)</h2>
+                <div class="detail-box">
+                    <ul class="detail-list">
+                        <li><span class="file-php">Category.php</span> - Danh mục sản phẩm</li>
+                        <li><span class="file-php">Debt.php</span> - Công nợ</li>
+                        <li><span class="file-php">DebtOrder.php</span> - Liên kết công nợ và đơn hàng</li>
+                        <li><span class="file-php">Order.php</span> - Đơn hàng</li>
+                        <li><span class="file-php">OrderAuditLog.php</span> - Lịch sử thay đổi đơn hàng</li>
+                        <li><span class="file-php">OrderItem.php</span> - Chi tiết đơn hàng</li>
+                        <li><span class="file-php">Payment.php</span> - Thanh toán</li>
+                        <li><span class="file-php">Product.php</span> - Sản phẩm</li>
+                        <li><span class="file-php">User.php</span> - Người dùng (Admin/Agent/Customer)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab: Pages -->
+        <div id="pages" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">📄 Pages (19 pages)</h2>
+                <div class="detail-box">
+                    <h3>Admin Pages</h3>
+                    <ul class="detail-list">
+                        <li><span class="file-tsx">/admin/page.tsx</span> - Dashboard admin</li>
+                        <li><span class="file-tsx">/admin/agents/page.tsx</span> - Quản lý đại lý</li>
+                        <li><span class="file-tsx">/admin/customers/page.tsx</span> - Quản lý khách hàng</li>
+                    </ul>
+                </div>
+                <div class="detail-box">
+                    <h3>Agent Pages</h3>
+                    <ul class="detail-list">
+                        <li><span class="file-tsx">/agent/page.tsx</span> - Dashboard đại lý</li>
+                        <li><span class="file-tsx">/agent/orders/page.tsx</span> - Quản lý đơn hàng</li>
+                        <li><span class="file-tsx">/agent/products/page.tsx</span> - Quản lý sản phẩm</li>
+                        <li><span class="file-tsx">/agent/debts/page.tsx</span> - Quản lý công nợ</li>
+                        <li><span class="file-tsx">/agent/debts/error.tsx</span> - Error page</li>
+                    </ul>
+                </div>
+                <div class="detail-box">
+                    <h3>Customer Pages</h3>
+                    <ul class="detail-list">
+                        <li><span class="file-tsx">/page.tsx</span> - Trang chủ</li>
+                        <li><span class="file-tsx">/cart/page.tsx</span> - Giỏ hàng</li>
+                        <li><span class="file-tsx">/checkout/page.tsx</span> - Thanh toán</li>
+                        <li><span class="file-tsx">/orders/page.tsx</span> - Đơn hàng của tôi</li>
+                        <li><span class="file-tsx">/debts/page.tsx</span> - Công nợ</li>
+                        <li><span class="file-tsx">/payments/[id]/page.tsx</span> - Chi tiết thanh toán</li>
+                    </ul>
+                </div>
+                <div class="detail-box">
+                    <h3>Auth Pages</h3>
+                    <ul class="detail-list">
+                        <li><span class="file-tsx">/login/page.tsx</span> - Đăng nhập</li>
+                        <li><span class="file-tsx">/register/page.tsx</span> - Đăng ký khách hàng</li>
+                        <li><span class="file-tsx">/register-agent/page.tsx</span> - Đăng ký đại lý</li>
+                        <li><span class="file-tsx">/refresh-user/page.tsx</span> - Refresh user data</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab: Deploy -->
+        <div id="deploy" class="tab-content">
+            <div class="deploy-section">
+                <h2>🚀 Hướng Dẫn Deploy Lên Host</h2>
+                
+                <div class="deploy-step">
+                    <h3>1. Chuẩn bị trước khi nén</h3>
+                    <div class="code-block">
+# Loại bỏ các thư mục không cần thiết:
+- api/vendor/          # Sẽ cài lại bằng composer
+- api/node_modules/    # Không cần
+- api/.env             # Tạo mới trên host
+- web/node_modules/    # Sẽ cài lại bằng npm
+- web/.next/           # Sẽ build lại
+- web/.env.local       # Tạo mới trên host
+- mobile/.dart_tool/   # Không cần
+- mobile/build/        # Không cần
+                    </div>
+                </div>
+                
+                <div class="deploy-step">
+                    <h3>2. Setup API Backend trên host</h3>
+                    <div class="code-block">
+cd api
+
+# Cài dependencies
+composer install --optimize-autoloader --no-dev
+
+# Tạo file .env
+cp .env.example .env
+# Sửa .env với thông tin thực:
+# APP_URL=https://api.banhmi.com
+# DB_DATABASE=banhmi
+# DB_USERNAME=your_user
+# DB_PASSWORD=your_password
+# APP_ENV=production
+# APP_DEBUG=false
+
+# Generate key
+php artisan key:generate
+
+# Chạy migrations
+php artisan migrate --force
+
+# Tạo storage link
+php artisan storage:link
+
+# Cache config
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
+# Set permissions
+chmod -R 775 storage bootstrap/cache
+chown -R www-data:www-data storage bootstrap/cache
+                    </div>
+                </div>
+                
+                <div class="deploy-step">
+                    <h3>3. Cấu hình CORS trong api/config/cors.php</h3>
+                    <div class="code-block">
+'allowed_origins' => [
+    'https://banhmi.com',        // Domain web của bạn
+    'https://www.banhmi.com',
+],
+                    </div>
+                </div>
+                
+                <div class="deploy-step">
+                    <h3>4. Setup Web Frontend trên host</h3>
+                    <div class="code-block">
+cd web
+
+# Cài dependencies
+npm install
+
+# Tạo file .env.production
+echo "NEXT_PUBLIC_API_URL=https://api.banhmi.com/api" > .env.production
+
+# Build production
+npm run build
+
+# Chạy (nếu dùng Node.js server)
+npm start
+
+# HOẶC nếu dùng static export
+# Upload thư mục .next/out/ lên host
+                    </div>
+                </div>
+                
+                <div class="deploy-step">
+                    <h3>5. Cấu hình Nginx cho API</h3>
+                    <div class="code-block">
+server {
+    listen 80;
+    server_name api.banhmi.com;
+    root /path/to/banhmi/api/public;
+    
+    index index.php;
+    
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+    
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
+                    </div>
+                </div>
+                
+                <div class="deploy-step">
+                    <h3>6. Checklist sau khi deploy</h3>
+                    <div class="code-block">
+✅ Đã cài composer install trong api/
+✅ Đã cài npm install trong web/
+✅ Đã tạo file .env trong api/ với thông tin đúng
+✅ Đã tạo file .env.production trong web/ với API URL
+✅ Đã chạy php artisan migrate
+✅ Đã chạy php artisan storage:link
+✅ Đã set permissions cho storage và bootstrap/cache
+✅ Đã cấu hình CORS trong api/config/cors.php
+✅ Đã build Next.js: npm run build
+✅ Đã cấu hình web server (Nginx/Apache)
+✅ Đã test API: curl https://api.banhmi.com/api/categories
+✅ Đã test Web: truy cập https://banhmi.com
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">🛠 Công Nghệ Sử Dụng</h2>
+            <div class="detail-box">
+                <h3>Backend</h3>
+                <ul class="detail-list">
+                    <li>Laravel 10 (PHP 8.1+)</li>
+                    <li>Laravel Sanctum (Authentication)</li>
+                    <li>MySQL/MariaDB</li>
+                </ul>
+            </div>
+            <div class="detail-box">
+                <h3>Web Frontend</h3>
+                <ul class="detail-list">
+                    <li>Next.js 14 (App Router)</li>
+                    <li>TypeScript</li>
+                    <li>React 18</li>
+                    <li>Tailwind CSS</li>
+                    <li>Zustand (State Management)</li>
+                    <li>Axios (HTTP Client)</li>
+                    <li>PWA Support (next-pwa)</li>
+                </ul>
+            </div>
+            <div class="detail-box">
+                <h3>Mobile</h3>
+                <ul class="detail-list">
+                    <li>Flutter (SDK >= 3.0.0)</li>
+                    <li>Dart</li>
+                    <li>Provider (State Management)</li>
+                    <li>HTTP package</li>
+                    <li>Shared Preferences</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function showTab(tabName) {
+            // Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active class from all tabs
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>

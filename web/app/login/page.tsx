@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authApi, LoginData } from '@/lib/api/auth'
 import { useAuthStore } from '@/lib/store/authStore'
+import { getApiBaseUrl } from '@/lib/config'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -90,7 +91,7 @@ export default function LoginPage() {
       
       // Handle network errors
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-        setErrorMessage('Không thể kết nối đến server. Vui lòng kiểm tra API đang chạy tại http://localhost:8000')
+        setErrorMessage(`Không thể kết nối đến server. Vui lòng kiểm tra API đang chạy tại ${getApiBaseUrl()}`)
         setIsLoading(false)
         return
       }

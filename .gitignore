@@ -78,3 +78,15 @@ api/storage/logs/*.log
 *.bak
 *.backup
 
+# Zip files (too large for Git)
+*.zip
+*.tar.gz
+*.gz
+api-backup.tar.gz
+api-deploy.zip
+api.zip
+web.zip
+web-deploy.zip
+web 2.zip
+web/out.zip
+
