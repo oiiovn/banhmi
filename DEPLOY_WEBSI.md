@@ -284,3 +284,4 @@ curl https://websi.vn/api/categories
 - Kiểm tra MySQL đang chạy: `sudo systemctl status mysql`
 - Kiểm tra user có quyền truy cập database
 
+

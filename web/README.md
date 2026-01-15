@@ -2,9 +2,7 @@
 
 Frontend web cho dự án Banhmi
 
-## Cài đặt
-
-1. Cài đặt dependencies:
+## Cài đặt1. Cài đặt dependencies:
 ```bash
 npm install
 # hoặc
@@ -14,9 +12,7 @@ yarn install
 2. Tạo file `.env.local`:
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000/api
-```
-
-3. Chạy development server:
+```3. Chạy development server:
 ```bash
 npm run dev
 # hoặc

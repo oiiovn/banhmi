@@ -120,3 +120,4 @@ Nếu hosting có LiteSpeed Cache hoặc caching plugin:
 - Nhưng thường không cần với static files
 - Chỉ cần upload files mới là đủ
 
+

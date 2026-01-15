@@ -14,7 +14,7 @@
 $SECRET = 'your-secret-key-here'; // ← Thay bằng secret key của bạn
 
 // Đường dẫn đến script deploy
-$DEPLOY_SCRIPT = __DIR__ . '/deploy-webhook.sh';
+$DEPLOY_SCRIPT = __DIR__ . '/deploy-webhook-v2.sh';
 
 // Log file
 $LOG_FILE = __DIR__ . '/deploy-webhook.log';

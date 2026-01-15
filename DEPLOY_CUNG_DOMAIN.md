@@ -251,3 +251,4 @@ curl https://websi.vn/storage/...
 - Nếu mới bắt đầu → Dùng **cùng domain** (đơn giản hơn)
 - Nếu cần scale sau này → Có thể chuyển sang **subdomain** (không cần sửa code)
 
+

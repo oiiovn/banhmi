@@ -2,16 +2,12 @@
 
 Mobile app cho dự án Banhmi
 
-## Cài đặt
-
-1. Đảm bảo bạn đã cài đặt Flutter SDK (>=3.0.0)
+## Cài đặt1. Đảm bảo bạn đã cài đặt Flutter SDK (>=3.0.0)
 
 2. Cài đặt dependencies:
 ```bash
 flutter pub get
-```
-
-3. Cấu hình API URL trong `lib/providers/product_provider.dart` và `lib/providers/auth_provider.dart`:
+```3. Cấu hình API URL trong `lib/providers/product_provider.dart` và `lib/providers/auth_provider.dart`:
 ```dart
 static const String baseUrl = 'http://YOUR_API_URL/api';
 ```

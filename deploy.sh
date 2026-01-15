@@ -157,3 +157,4 @@ echo "   4. Test API: curl https://${API_DOMAIN}/api/categories"
 echo "   5. Test Web: truy cập https://${WEB_DOMAIN}"
 echo ""
 
+

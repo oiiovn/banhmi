@@ -261,3 +261,4 @@ ls -la public_html/
    - Nếu vẫn 403 → Vấn đề hosting/config
    - Nếu OK → Vấn đề Next.js setup
 
+

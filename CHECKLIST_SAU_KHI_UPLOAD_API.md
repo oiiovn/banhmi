@@ -357,3 +357,4 @@ npm start
 - **Database:** Phải tạo trước khi chạy migrations
 - **DNS:** Có thể mất 5-30 phút để propagate
 
+

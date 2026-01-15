@@ -135,3 +135,4 @@ chmod -R 755 /domains/websi.vn/public_html
    - Nếu file đơn giản cũng 403 → Vấn đề hosting
    - Nếu file đơn giản OK → Vấn đề Next.js
 
+

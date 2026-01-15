@@ -204,3 +204,4 @@ chmod -R 755 public_html/
 - **.htaccess** cần thiết cho routing
 - **Permissions** phải đúng (755 cho folders, 644 cho files)
 
+

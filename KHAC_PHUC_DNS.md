@@ -246,3 +246,4 @@ Nếu bạn biết IP của server, có thể test tạm thời:
 - **Storage permissions** phải đúng (775)
 - **Database** phải được tạo trước
 
+

@@ -165,3 +165,4 @@ mysql -u username -p database_name < backup.sql
 - Xem dữ liệu: Qua phpMyAdmin
 - Backup: Export từ phpMyAdmin hoặc mysqldump
 
+

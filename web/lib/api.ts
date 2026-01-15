@@ -19,10 +19,8 @@ api.interceptors.request.use(
       const apiUrl = getApiUrl()
       config.baseURL = apiUrl
       
-      // Debug log (chỉ trong development)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('API URL:', apiUrl)
-      }
+      // Debug log (luôn hiển thị để debug trên production)
+      console.log('🌐 API URL đang dùng:', apiUrl)
       
       const token = localStorage.getItem('token')
       if (token) {

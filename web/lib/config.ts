@@ -18,13 +18,17 @@ const detectApiUrl = (): string => {
   if (typeof window !== 'undefined') {
     const origin = window.location.origin
     const hostname = window.location.hostname
+    const protocol = window.location.protocol
     
-    // Nếu đang ở trên domain websi.vn (production)
+    // Nếu đang ở trên domain websi.vn (production cụ thể)
     if (origin.includes('websi.vn') || hostname.includes('websi.vn')) {
-      return 'https://api.websi.vn/api'
+      // Thử subdomain api.websi.vn trước (phổ biến nhất)
+      // Nếu không hoạt động, có thể thử cùng domain websi.vn/api
+      const domain = hostname.replace('www.', '')
+      return `${protocol}//api.${domain}/api`
     }
     
-    // Nếu không phải localhost, local IP, hoặc empty -> dùng production
+    // Nếu không phải localhost, local IP -> tự động detect API URL dựa trên domain hiện tại
     if (
       hostname !== 'localhost' && 
       hostname !== '127.0.0.1' && 
@@ -34,9 +38,23 @@ const detectApiUrl = (): string => {
       hostname !== '' &&
       hostname !== '0.0.0.0'
     ) {
-      // Nếu không phải localhost -> có thể là production hoặc staging
-      // Mặc định dùng production API
-      return 'https://api.websi.vn/api'
+      // Tự động detect API URL dựa trên domain hiện tại
+      // Thử các pattern phổ biến:
+      
+      // Pattern 1: Nếu đang ở subdomain www hoặc không có subdomain
+      // Thử dùng api.{hostname} hoặc cùng domain
+      if (hostname.startsWith('www.')) {
+        // Nếu có www, bỏ www và thêm api
+        const domain = hostname.replace('www.', '')
+        return `${protocol}//api.${domain}/api`
+      } else if (hostname.startsWith('api.')) {
+        // Nếu đã ở subdomain api, dùng cùng domain
+        return `${origin}/api`
+      } else {
+        // Pattern 2: Thử subdomain api trước
+        // Nếu không có subdomain, thử api.{hostname}
+        return `${protocol}//api.${hostname}/api`
+      }
     }
   }
   

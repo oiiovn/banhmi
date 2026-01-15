@@ -213,3 +213,4 @@ curl https://api.websi.vn/api/categories
 - Upload `vendor/` từ local (sau khi chạy `composer install` trên máy local)
 - Dùng file manager để tạo `.env` và sửa file
 
+

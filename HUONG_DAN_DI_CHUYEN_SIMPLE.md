@@ -24,3 +24,4 @@ Sau khi xong, trong `public_html/` sẽ có:
 - Click chuột phải vào files đã chọn → chọn "Move" hoặc "Cut"
 - Hoặc tìm icon có hình mũi tên (→)
 
+

@@ -94,3 +94,4 @@ public_html/
 - **PHẢI** để nội dung trực tiếp trong `public_html/`
 - File `index.html` phải ở ngay trong `public_html/`, không phải trong `public_html/web/`
 
+

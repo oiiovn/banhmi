@@ -19,9 +19,7 @@ cp .env.example .env
 php artisan key:generate
 ```
 
-4. Cấu hình database trong file `.env`
-
-5. Chạy migrations:
+4. Cấu hình database trong file `.env`5. Chạy migrations:
 ```bash
 php artisan migrate
 ```
@@ -37,9 +35,7 @@ API sẽ chạy tại `http://localhost:8000`
 
 - **Admin**: Quản lý toàn bộ hệ thống (đại lý, sản phẩm, đơn hàng)
 - **Đại lý (Agent)**: Quản lý đơn hàng được phân công, cập nhật trạng thái đơn hàng
-- **Khách hàng (Customer)**: Đặt hàng và xem đơn hàng của mình
-
-## API Endpoints
+- **Khách hàng (Customer)**: Đặt hàng và xem đơn hàng của mình## API Endpoints
 
 ### Authentication (Public)
 - `POST /api/register` - Đăng ký tài khoản khách hàng mới

@@ -181,3 +181,4 @@ find public_html/ -type d -exec chmod 755 {} \;
 - [ ] Đã kiểm tra có file `index.html` không
 - [ ] Đã test: `websi.vn`
 
+

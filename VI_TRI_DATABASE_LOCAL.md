@@ -233,3 +233,4 @@ mysql -u root -p -e "SHOW VARIABLES LIKE 'datadir';"
 - Vị trí: Trong thư mục data của MySQL
 - Truy cập: Qua MySQL command line hoặc phpMyAdmin
 
+
