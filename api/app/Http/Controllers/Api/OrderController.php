@@ -230,53 +230,55 @@ class OrderController extends Controller
             if ($order->agent_id) {
                 $orderAmount = $order->total_amount - ($order->discount ?? 0);
                 
-                // Tìm công nợ tổng (order_id = null) của cặp (customer, agent)
-                // Không phụ thuộc vào status, vì có thể đã thanh toán một phần nhưng vẫn cần gộp đơn hàng mới
-                $consolidatedDebt = Debt::where('customer_id', $order->user_id)
-                    ->where('agent_id', $order->agent_id)
-                    ->whereNull('order_id') // Chỉ tìm công nợ tổng (không phải công nợ đơn lẻ)
-                    ->first();
+                // QUAN TRỌNG: Kiểm tra xem đơn hàng đã có DebtOrder chưa (tránh unique constraint violation)
+                $existingDebtOrder = DebtOrder::where('order_id', $order->id)->first();
                 
-                if ($consolidatedDebt) {
-                    // Cộng vào công nợ tổng hiện có
-                    $consolidatedDebt->total_amount += $orderAmount;
-                    // Cập nhật remaining_amount dựa trên paid_amount hiện tại
-                    $consolidatedDebt->remaining_amount = $consolidatedDebt->total_amount - $consolidatedDebt->paid_amount;
-                    $consolidatedDebt->updateStatus(); // Cập nhật lại status
-                    $consolidatedDebt->save();
-                    
-                    // Kiểm tra xem đơn hàng đã được liên kết chưa (tránh trùng lặp)
-                    $existingDebtOrder = \App\Models\DebtOrder::where('debt_id', $consolidatedDebt->id)
-                        ->where('order_id', $order->id)
+                if ($existingDebtOrder) {
+                    // Đơn hàng đã được liên kết với một debt rồi
+                    // Có thể do đã xác nhận trước đó hoặc có debt đơn lẻ
+                    // Không tạo mới, chỉ log để debug
+                    \Log::warning("Order #{$order->id} already has DebtOrder #{$existingDebtOrder->id}. Skipping debt creation.");
+                } else {
+                    // Tìm công nợ tổng (order_id = null) của cặp (customer, agent)
+                    // Không phụ thuộc vào status, vì có thể đã thanh toán một phần nhưng vẫn cần gộp đơn hàng mới
+                    $consolidatedDebt = Debt::where('customer_id', $order->user_id)
+                        ->where('agent_id', $order->agent_id)
+                        ->whereNull('order_id') // Chỉ tìm công nợ tổng (không phải công nợ đơn lẻ)
                         ->first();
                     
-                    if (!$existingDebtOrder) {
+                    if ($consolidatedDebt) {
+                        // Cộng vào công nợ tổng hiện có
+                        $consolidatedDebt->total_amount += $orderAmount;
+                        // Cập nhật remaining_amount dựa trên paid_amount hiện tại
+                        $consolidatedDebt->remaining_amount = $consolidatedDebt->total_amount - $consolidatedDebt->paid_amount;
+                        $consolidatedDebt->updateStatus(); // Cập nhật lại status và save
+                        
                         // Liên kết đơn hàng với công nợ tổng
-                        \App\Models\DebtOrder::create([
+                        DebtOrder::create([
                             'debt_id' => $consolidatedDebt->id,
                             'order_id' => $order->id,
                             'amount' => $orderAmount,
                         ]);
+                    } else {
+                        // Tạo công nợ tổng mới
+                        $newDebt = Debt::create([
+                            'order_id' => null, // Không liên kết trực tiếp với một đơn hàng cụ thể
+                            'customer_id' => $order->user_id,
+                            'agent_id' => $order->agent_id,
+                            'total_amount' => $orderAmount,
+                            'paid_amount' => 0,
+                            'remaining_amount' => $orderAmount,
+                            'status' => 'pending',
+                            'notes' => "Công nợ tổng - Đơn hàng #{$order->id}",
+                        ]);
+                        
+                        // Liên kết đơn hàng với công nợ tổng
+                        DebtOrder::create([
+                            'debt_id' => $newDebt->id,
+                            'order_id' => $order->id,
+                            'amount' => $orderAmount,
+                        ]);
                     }
-                } else {
-                    // Tạo công nợ tổng mới
-                    $newDebt = Debt::create([
-                        'order_id' => null, // Không liên kết trực tiếp với một đơn hàng cụ thể
-                        'customer_id' => $order->user_id,
-                        'agent_id' => $order->agent_id,
-                        'total_amount' => $orderAmount,
-                        'paid_amount' => 0,
-                        'remaining_amount' => $orderAmount,
-                        'status' => 'pending',
-                        'notes' => "Công nợ tổng - Đơn hàng #{$order->id}",
-                    ]);
-                    
-                    // Liên kết đơn hàng với công nợ tổng
-                    \App\Models\DebtOrder::create([
-                        'debt_id' => $newDebt->id,
-                        'order_id' => $order->id,
-                        'amount' => $orderAmount,
-                    ]);
                 }
             }
 
@@ -291,10 +293,19 @@ class OrderController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+            
+            // Log chi tiết lỗi để debug
+            \Log::error('Failed to confirm order', [
+                'order_id' => $id,
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to confirm order',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'Có lỗi xảy ra khi xác nhận đơn hàng. Vui lòng thử lại.',
             ], 500);
         }
     }
