@@ -11,6 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Kiểm tra xem bảng đã tồn tại chưa (có thể đã được tạo từ migration khác)
+        if (Schema::hasTable('payments')) {
+            return;
+        }
+        
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('debt_id')->constrained('debts')->onDelete('cascade');
