@@ -130,16 +130,23 @@ class PaymentController extends Controller
             // 3. Agent có thể thanh toán công nợ mà mình là agent (debt->agent_id === user->id) - nhưng thường không cần
             // 4. Admin có thể thanh toán mọi công nợ
             
+            // Chuyển đổi ID sang cùng kiểu để so sánh chính xác
+            $userId = (int) $user->id;
+            $debtCustomerId = (int) $debt->customer_id;
+            $debtAgentId = (int) $debt->agent_id;
+            
             $isAuthorized = false;
             
             // Log để debug (chỉ trên local hoặc khi debug mode)
             if (config('app.debug')) {
                 \Illuminate\Support\Facades\Log::info('Payment authorization check', [
-                    'user_id' => $user->id,
+                    'user_id' => $userId,
                     'user_role' => $user->role,
                     'debt_id' => $debt->id,
-                    'debt_customer_id' => $debt->customer_id,
-                    'debt_agent_id' => $debt->agent_id,
+                    'debt_customer_id' => $debtCustomerId,
+                    'debt_agent_id' => $debtAgentId,
+                    'customer_match' => ($debtCustomerId === $userId),
+                    'agent_match' => ($debtAgentId === $userId),
                 ]);
             }
             
@@ -148,28 +155,34 @@ class PaymentController extends Controller
                 $isAuthorized = true;
             } elseif ($user->role === 'customer') {
                 // Customer chỉ có thể thanh toán công nợ của chính mình
-                $isAuthorized = ($debt->customer_id == $user->id); // Dùng == để so sánh số
+                // Đây là trường hợp phổ biến nhất: customer nợ đại lý và cần thanh toán
+                $isAuthorized = ($debtCustomerId === $userId);
             } elseif ($user->role === 'agent') {
                 // Agent có thể thanh toán công nợ mà mình là customer (chế độ khách hàng)
                 // Hoặc công nợ mà mình là agent (nhưng thường không cần)
-                $isAuthorized = ($debt->customer_id == $user->id || $debt->agent_id == $user->id);
+                $isAuthorized = ($debtCustomerId === $userId || $debtAgentId === $userId);
             }
             
             if (!$isAuthorized) {
                 // Log chi tiết lỗi để debug
                 \Illuminate\Support\Facades\Log::warning('Payment unauthorized', [
-                    'user_id' => $user->id,
+                    'user_id' => $userId,
                     'user_role' => $user->role,
                     'debt_id' => $debt->id,
-                    'debt_customer_id' => $debt->customer_id,
-                    'debt_agent_id' => $debt->agent_id,
-                    'customer_match' => ($debt->customer_id == $user->id),
-                    'agent_match' => ($debt->agent_id == $user->id),
+                    'debt_customer_id' => $debtCustomerId,
+                    'debt_agent_id' => $debtAgentId,
+                    'customer_match' => ($debtCustomerId === $userId),
+                    'agent_match' => ($debtAgentId === $userId),
                 ]);
                 
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthorized. Bạn không có quyền thanh toán công nợ này. Vui lòng kiểm tra lại công nợ thuộc về bạn.',
+                    'debug' => config('app.debug') ? [
+                        'user_id' => $userId,
+                        'debt_customer_id' => $debtCustomerId,
+                        'match' => $debtCustomerId === $userId,
+                    ] : null,
                 ], 403);
             }
 
