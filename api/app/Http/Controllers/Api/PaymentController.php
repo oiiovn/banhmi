@@ -124,24 +124,30 @@ class PaymentController extends Controller
             $user = $request->user();
 
             // Check permission
-            // Cho phép customer hoặc agent (khi thanh toán công nợ của chính mình với tư cách customer)
-            if ($user->role === 'customer' || ($user->role === 'agent' && $debt->customer_id === $user->id)) {
-                if ($debt->customer_id !== $user->id) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Unauthorized',
-                    ], 403);
-                }
-            } elseif ($user->role === 'agent' && $debt->agent_id === $user->id) {
-                // Agent thanh toán công nợ với tư cách đại lý
-                // Cho phép
-            } elseif ($user->role === 'admin') {
-                // Admin có thể tạo payment
-                // Cho phép
-            } else {
+            // QUY TẮC:
+            // 1. Customer chỉ có thể thanh toán công nợ của chính mình (debt->customer_id === user->id)
+            // 2. Agent có thể thanh toán công nợ mà mình là customer (debt->customer_id === user->id)
+            // 3. Agent có thể thanh toán công nợ mà mình là agent (debt->agent_id === user->id) - nhưng thường không cần
+            // 4. Admin có thể thanh toán mọi công nợ
+            
+            $isAuthorized = false;
+            
+            if ($user->role === 'admin') {
+                // Admin có thể tạo payment cho mọi công nợ
+                $isAuthorized = true;
+            } elseif ($user->role === 'customer') {
+                // Customer chỉ có thể thanh toán công nợ của chính mình
+                $isAuthorized = ($debt->customer_id === $user->id);
+            } elseif ($user->role === 'agent') {
+                // Agent có thể thanh toán công nợ mà mình là customer (chế độ khách hàng)
+                // Hoặc công nợ mà mình là agent (nhưng thường không cần)
+                $isAuthorized = ($debt->customer_id === $user->id || $debt->agent_id === $user->id);
+            }
+            
+            if (!$isAuthorized) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Unauthorized',
+                    'message' => 'Unauthorized. Bạn không có quyền thanh toán công nợ này.',
                 ], 403);
             }
 
