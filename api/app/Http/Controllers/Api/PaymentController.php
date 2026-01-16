@@ -409,7 +409,7 @@ class PaymentController extends Controller
     }
 
     /**
-     * Agent từ chối thanh toán (nếu cần)
+     * Agent từ chối thanh toán đang chờ xác nhận
      */
     public function rejectPayment(Request $request, $id)
     {
@@ -420,14 +420,39 @@ class PaymentController extends Controller
             ], 403);
         }
 
-        $payment = Payment::findOrFail($id);
-        $agentId = $request->user()->id;
+        $payment = Payment::with('debt')->findOrFail($id);
+        $agentId = (int) $request->user()->id;
+        $paymentAgentId = (int) $payment->agent_id;
 
         // Kiểm tra payment thuộc về đại lý này
-        if ($payment->agent_id !== $agentId) {
+        // Đại lý chỉ có thể từ chối thanh toán của công nợ mà mình là đại lý
+        if ($paymentAgentId !== $agentId) {
+            \Illuminate\Support\Facades\Log::warning('Agent tried to reject payment not belonging to them', [
+                'agent_id' => $agentId,
+                'payment_agent_id' => $paymentAgentId,
+                'payment_id' => $payment->id,
+                'debt_id' => $payment->debt_id,
+            ]);
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized',
+                'message' => 'Unauthorized. Bạn chỉ có thể từ chối thanh toán của công nợ thuộc về bạn.',
+            ], 403);
+        }
+        
+        // Kiểm tra thêm: debt phải thuộc về đại lý này
+        $debtAgentId = (int) $payment->debt->agent_id;
+        if ($debtAgentId !== $agentId) {
+            \Illuminate\Support\Facades\Log::warning('Agent tried to reject payment for debt not belonging to them', [
+                'agent_id' => $agentId,
+                'debt_agent_id' => $debtAgentId,
+                'payment_id' => $payment->id,
+                'debt_id' => $payment->debt_id,
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Công nợ này không thuộc về bạn.',
             ], 403);
         }
 
@@ -435,21 +460,45 @@ class PaymentController extends Controller
         if ($payment->status !== 'pending_confirmation') {
             return response()->json([
                 'success' => false,
-                'message' => 'Payment is not pending confirmation',
+                'message' => 'Chỉ có thể từ chối thanh toán đang chờ xác nhận.',
             ], 400);
         }
 
-        $payment->status = 'rejected';
-        $payment->confirmed_at = now();
-        $payment->confirmed_by = $agentId; // Lưu người từ chối
-        $payment->save();
+        DB::beginTransaction();
 
-        $payment->load(['debt.order', 'customer', 'agent', 'confirmedBy']);
+        try {
+            // Cập nhật payment status thành rejected
+            $payment->status = 'rejected';
+            $payment->confirmed_at = now();
+            $payment->confirmed_by = $agentId; // Lưu người từ chối
+            $payment->save();
 
-        return response()->json([
-            'success' => true,
-            'data' => $payment,
-            'message' => 'Payment rejected',
-        ]);
+            // KHÔNG cập nhật debt status vì payment bị từ chối
+            // Debt vẫn giữ nguyên, customer có thể tạo payment mới
+
+            DB::commit();
+
+            $payment->load(['debt.order', 'customer', 'agent', 'confirmedBy']);
+
+            return response()->json([
+                'success' => true,
+                'data' => $payment,
+                'message' => 'Đã từ chối thanh toán thành công.',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            \Illuminate\Support\Facades\Log::error('Failed to reject payment', [
+                'payment_id' => $payment->id,
+                'agent_id' => $agentId,
+                'error' => $e->getMessage(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Không thể từ chối thanh toán. Vui lòng thử lại.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 }
