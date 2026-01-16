@@ -334,13 +334,38 @@ class PaymentController extends Controller
         }
 
         $payment = Payment::with('debt')->findOrFail($id);
-        $agentId = $request->user()->id;
+        $agentId = (int) $request->user()->id;
+        $paymentAgentId = (int) $payment->agent_id;
 
         // Kiểm tra payment thuộc về đại lý này
-        if ($payment->agent_id !== $agentId) {
+        // Đại lý chỉ có thể xác nhận thanh toán của công nợ mà mình là đại lý
+        if ($paymentAgentId !== $agentId) {
+            \Illuminate\Support\Facades\Log::warning('Agent tried to confirm payment not belonging to them', [
+                'agent_id' => $agentId,
+                'payment_agent_id' => $paymentAgentId,
+                'payment_id' => $payment->id,
+                'debt_id' => $payment->debt_id,
+            ]);
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized',
+                'message' => 'Unauthorized. Bạn chỉ có thể xác nhận thanh toán của công nợ thuộc về bạn.',
+            ], 403);
+        }
+        
+        // Kiểm tra thêm: debt phải thuộc về đại lý này
+        $debtAgentId = (int) $payment->debt->agent_id;
+        if ($debtAgentId !== $agentId) {
+            \Illuminate\Support\Facades\Log::warning('Agent tried to confirm payment for debt not belonging to them', [
+                'agent_id' => $agentId,
+                'debt_agent_id' => $debtAgentId,
+                'payment_id' => $payment->id,
+                'debt_id' => $payment->debt_id,
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Công nợ này không thuộc về bạn.',
             ], 403);
         }
 
