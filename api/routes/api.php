@@ -116,6 +116,13 @@ Route::middleware(['auth:sanctum', 'agent'])->prefix('agent')->group(function ()
     Route::get('/debts', [DebtController::class, 'indexForAgent']);
     Route::get('/debts/{id}', [DebtController::class, 'show']);
     Route::put('/debts/{id}', [DebtController::class, 'update']);
+    
+    // Debt transfer routes
+    Route::post('/debts/transfer', [DebtController::class, 'createTransfer']);
+    Route::get('/debts/transfers/pending', [DebtController::class, 'getPendingTransfers']);
+    Route::post('/debts/transfers/{id}/confirm', [DebtController::class, 'confirmTransfer']);
+    Route::post('/debts/transfers/{id}/reject', [DebtController::class, 'rejectTransfer']);
+    
     Route::get('/payments', [PaymentController::class, 'indexForAgent']);
     Route::get('/payments/pending', [PaymentController::class, 'getPendingPayments']);
     Route::post('/payments', [PaymentController::class, 'store']);

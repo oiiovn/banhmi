@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Debt;
+use App\Models\DebtTransfer;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -234,6 +235,242 @@ class DebtController extends Controller
             'success' => true,
             'data' => $debt,
             'message' => 'Debt updated successfully',
+        ]);
+    }
+
+    /**
+     * Tạo yêu cầu chuyển công nợ
+     * Ví dụ: A nợ B 500k, B nợ A 100k → chuyển 100k → A còn nợ B 400k
+     */
+    public function createTransfer(Request $request)
+    {
+        if (!$request->user()->isAgent()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only agents can create debt transfers',
+            ], 403);
+        }
+
+        $request->validate([
+            'from_debt_id' => 'required|exists:debts,id', // Công nợ A nợ B
+            'to_debt_id' => 'required|exists:debts,id',   // Công nợ B nợ A
+            'amount' => 'required|numeric|min:0.01',
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        $agentId = $request->user()->id;
+
+        // Validate debts
+        $fromDebt = Debt::findOrFail($request->from_debt_id);
+        $toDebt = Debt::findOrFail($request->to_debt_id);
+
+        // Kiểm tra: from_debt phải là công nợ A nợ B (A là customer, B là agent)
+        if ($fromDebt->customer_id !== $agentId || $fromDebt->agent_id === $agentId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'from_debt_id phải là công nợ bạn nợ đại lý khác',
+            ], 400);
+        }
+
+        // Kiểm tra: to_debt phải là công nợ B nợ A (B là customer, A là agent)
+        if ($toDebt->agent_id !== $agentId || $toDebt->customer_id === $agentId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'to_debt_id phải là công nợ đại lý khác nợ bạn',
+            ], 400);
+        }
+
+        // Kiểm tra: hai công nợ phải cùng cặp (A-B và B-A)
+        if ($fromDebt->agent_id !== $toDebt->customer_id || $fromDebt->customer_id !== $toDebt->agent_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hai công nợ không phải cùng một cặp đại lý',
+            ], 400);
+        }
+
+        // Kiểm tra: amount không được vượt quá min(remaining_amount của cả hai công nợ)
+        $maxAmount = min($fromDebt->remaining_amount, $toDebt->remaining_amount);
+        if ($request->amount > $maxAmount) {
+            return response()->json([
+                'success' => false,
+                'message' => "Số tiền chuyển không được vượt quá {$maxAmount} đ",
+            ], 400);
+        }
+
+        // Kiểm tra: cả hai công nợ phải còn nợ (status không phải 'paid')
+        if ($fromDebt->status === 'paid' || $toDebt->status === 'paid') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Không thể chuyển công nợ đã thanh toán hết',
+            ], 400);
+        }
+
+        // Tạo yêu cầu chuyển công nợ
+        $debtTransfer = DebtTransfer::create([
+            'from_debt_id' => $request->from_debt_id,
+            'to_debt_id' => $request->to_debt_id,
+            'amount' => $request->amount,
+            'status' => 'pending',
+            'initiated_by' => $agentId,
+            'description' => $request->description,
+        ]);
+
+        $debtTransfer->load(['fromDebt.agent', 'toDebt.customer', 'initiator']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $debtTransfer,
+            'message' => 'Yêu cầu chuyển công nợ đã được tạo',
+        ], 201);
+    }
+
+    /**
+     * Lấy danh sách yêu cầu chuyển công nợ pending (người cần xác nhận)
+     */
+    public function getPendingTransfers(Request $request)
+    {
+        if (!$request->user()->isAgent()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only agents can view pending transfers',
+            ], 403);
+        }
+
+        $agentId = $request->user()->id;
+
+        // Lấy các yêu cầu chuyển công nợ mà người này cần xác nhận
+        // (to_debt là công nợ đại lý khác nợ mình → mình là agent của to_debt)
+        $transfers = DebtTransfer::with([
+            'fromDebt.customer',
+            'fromDebt.agent',
+            'toDebt.customer',
+            'toDebt.agent',
+            'initiator',
+        ])
+        ->where('status', 'pending')
+        ->whereHas('toDebt', function($query) use ($agentId) {
+            $query->where('agent_id', $agentId); // to_debt: đại lý khác nợ mình (mình là agent)
+        })
+        ->orderBy('created_at', 'desc')
+        ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $transfers,
+        ]);
+    }
+
+    /**
+     * Xác nhận yêu cầu chuyển công nợ
+     */
+    public function confirmTransfer(Request $request, $id)
+    {
+        if (!$request->user()->isAgent()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only agents can confirm transfers',
+            ], 403);
+        }
+
+        $agentId = $request->user()->id;
+        $debtTransfer = DebtTransfer::with(['fromDebt', 'toDebt'])->findOrFail($id);
+
+        // Kiểm tra: chỉ người cần xác nhận mới có quyền xác nhận
+        if ($debtTransfer->toDebt->agent_id !== $agentId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bạn không có quyền xác nhận yêu cầu này',
+            ], 403);
+        }
+
+        // Kiểm tra: yêu cầu phải ở trạng thái pending
+        if ($debtTransfer->status !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Yêu cầu này không thể xác nhận',
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Cập nhật công nợ
+            // from_debt: A nợ B → trừ amount
+            $fromDebt = $debtTransfer->fromDebt;
+            $fromDebt->remaining_amount -= $debtTransfer->amount;
+            $fromDebt->updateStatus();
+            $fromDebt->save();
+
+            // to_debt: B nợ A → trừ amount
+            $toDebt = $debtTransfer->toDebt;
+            $toDebt->remaining_amount -= $debtTransfer->amount;
+            $toDebt->updateStatus();
+            $toDebt->save();
+
+            // Cập nhật trạng thái debt_transfer
+            $debtTransfer->status = 'confirmed';
+            $debtTransfer->confirmed_by = $agentId;
+            $debtTransfer->confirmed_at = now();
+            $debtTransfer->save();
+
+            DB::commit();
+
+            $debtTransfer->load(['fromDebt.customer', 'fromDebt.agent', 'toDebt.customer', 'toDebt.agent', 'initiator', 'confirmer']);
+
+            return response()->json([
+                'success' => true,
+                'data' => $debtTransfer,
+                'message' => 'Đã xác nhận chuyển công nợ thành công',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Không thể xác nhận chuyển công nợ: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Từ chối yêu cầu chuyển công nợ
+     */
+    public function rejectTransfer(Request $request, $id)
+    {
+        if (!$request->user()->isAgent()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only agents can reject transfers',
+            ], 403);
+        }
+
+        $agentId = $request->user()->id;
+        $debtTransfer = DebtTransfer::findOrFail($id);
+
+        // Kiểm tra: chỉ người cần xác nhận mới có quyền từ chối
+        if ($debtTransfer->toDebt->agent_id !== $agentId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bạn không có quyền từ chối yêu cầu này',
+            ], 403);
+        }
+
+        // Kiểm tra: yêu cầu phải ở trạng thái pending
+        if ($debtTransfer->status !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Yêu cầu này không thể từ chối',
+            ], 400);
+        }
+
+        $debtTransfer->status = 'rejected';
+        $debtTransfer->rejected_at = now();
+        $debtTransfer->save();
+
+        $debtTransfer->load(['fromDebt.customer', 'fromDebt.agent', 'toDebt.customer', 'toDebt.agent', 'initiator']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $debtTransfer,
+            'message' => 'Đã từ chối yêu cầu chuyển công nợ',
         ]);
     }
 }

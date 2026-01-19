@@ -12,6 +12,7 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AgentController extends Controller
 {
@@ -124,12 +125,21 @@ class AgentController extends Controller
 
     /**
      * Get pending order details (for editing before accept)
+     * Cho phép lấy đơn hàng chưa nhận (agent_id = null) hoặc đã nhận nhưng vẫn pending
      */
     public function getPendingOrder(Request $request, $id)
     {
+        $agentId = $request->user()->id;
+        
+        // Cho phép lấy đơn hàng:
+        // 1. Chưa được nhận (agent_id = null)
+        // 2. Đã được nhận bởi đại lý này và vẫn pending
         $order = Order::with(['user', 'items.product', 'auditLogs.user'])
-            ->whereNull('agent_id')
             ->where('status', 'pending')
+            ->where(function($query) use ($agentId) {
+                $query->whereNull('agent_id')
+                      ->orWhere('agent_id', $agentId);
+            })
             ->findOrFail($id);
 
         return response()->json([
@@ -236,16 +246,25 @@ class AgentController extends Controller
         $request->validate([
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.quantity' => 'required|numeric|min:0.1', // Cho phép số lượng thập phân (ví dụ: 1.5, 2.3)
             'items.*.price' => 'nullable|numeric|min:0', // Cho phép sửa giá
             'discount' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string|max:1000', // Cho phép thêm ghi chú
         ]);
 
-        $order = Order::whereNull('agent_id')
-            ->where('status', 'pending')
+        $agentId = $request->user()->id;
+        
+        // Cho phép sửa đơn hàng:
+        // 1. Chưa được nhận (agent_id = null)
+        // 2. Đã được nhận bởi đại lý này và vẫn pending
+        $order = Order::where('status', 'pending')
+            ->where(function($query) use ($agentId) {
+                $query->whereNull('agent_id')
+                      ->orWhere('agent_id', $agentId);
+            })
             ->findOrFail($id);
 
-        $userId = $request->user()->id;
+        $userId = $agentId;
 
         DB::beginTransaction();
         try {
@@ -399,6 +418,23 @@ class AgentController extends Controller
                 $order->discount = $discount;
             }
 
+            // Update notes if provided
+            if ($request->has('notes')) {
+                $oldNotes = $order->notes ?? '';
+                $newNotes = $request->notes ?? '';
+                if ($oldNotes !== $newNotes) {
+                    $changes[] = [
+                        'action' => 'update_notes',
+                        'entity_type' => 'order',
+                        'entity_id' => $order->id,
+                        'old_value' => ['notes' => $oldNotes],
+                        'new_value' => ['notes' => $newNotes],
+                        'description' => "Cập nhật ghi chú đơn hàng",
+                    ];
+                    $order->notes = $newNotes;
+                }
+            }
+
             // Update total amount
             $order->total_amount = $finalAmount;
             $order->save();
@@ -442,13 +478,35 @@ class AgentController extends Controller
     {
         $agentId = $request->user()->id;
 
-        $order = Order::whereNull('agent_id')
-            ->where('status', 'pending')
+        // Cho phép nhận đơn hàng:
+        // 1. Chưa được nhận (agent_id = null)
+        // 2. Đã được nhận bởi đại lý này và vẫn pending
+        $order = Order::where('status', 'pending')
+            ->where(function($query) use ($agentId) {
+                $query->whereNull('agent_id')
+                      ->orWhere('agent_id', $agentId);
+            })
             ->findOrFail($id);
+
+        // Validate notes if provided
+        if ($request->has('notes')) {
+            $request->validate([
+                'notes' => 'nullable|string|max:1000',
+            ]);
+        }
 
         DB::beginTransaction();
         try {
-            $order->agent_id = $agentId;
+            // Nếu chưa có agent_id, set nó
+            if (!$order->agent_id) {
+                $order->agent_id = $agentId;
+            }
+            
+            // Cập nhật notes nếu có
+            if ($request->has('notes')) {
+                $order->notes = $request->notes;
+            }
+            
             $order->status = 'confirmed';
             $order->accepted_at = now();
             $order->accepted_by = $agentId;
