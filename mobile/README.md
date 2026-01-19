@@ -15,9 +15,7 @@ static const String baseUrl = 'http://YOUR_API_URL/api';
 4. Chạy ứng dụng:
 ```bash
 flutter run
-```
-
-## Cấu trúc dự án
+```## Cấu trúc dự án
 
 - `lib/main.dart` - Entry point của ứng dụng
 - `lib/screens/` - Các màn hình

@@ -650,13 +650,8 @@ class AgentController extends Controller
             $data['name'] = mb_convert_case(trim($data['name']), MB_CASE_TITLE, 'UTF-8');
         }
 
-        // Tự động tạo mô tả: "Số lượng xxx + đơn vị + là giá + đ"
-        if (isset($data['quantity_per_unit']) && isset($data['unit']) && isset($data['wholesale_price'])) {
-            $quantity = $data['quantity_per_unit'];
-            $unit = $data['unit'];
-            $price = number_format($data['wholesale_price'], 0, ',', '.');
-            $data['description'] = "Số lượng {$quantity} {$unit} là giá {$price} đ";
-        }
+        // Đã tắt tự động tạo mô tả - cho phép người dùng tự nhập mô tả tùy ý
+        // Giữ nguyên description từ request (đã có trong $data)
 
         $product = Product::create($data);
 
@@ -811,15 +806,8 @@ class AgentController extends Controller
             $data['name'] = mb_convert_case(trim($data['name']), MB_CASE_TITLE, 'UTF-8');
         }
 
-        // Tự động tạo mô tả: "Số lượng xxx + đơn vị + là giá (giá sỉ)"
-        $quantity = $request->has('quantity_per_unit') ? ($data['quantity_per_unit'] ?? $product->quantity_per_unit) : $product->quantity_per_unit;
-        $unit = $request->has('unit') ? ($data['unit'] ?? $product->unit) : $product->unit;
-        $wholesalePrice = $request->has('wholesale_price') ? ($data['wholesale_price'] ?? $product->wholesale_price) : $product->wholesale_price;
-        
-        if ($quantity && $unit && $wholesalePrice) {
-            $price = number_format($wholesalePrice, 0, ',', '.');
-            $data['description'] = "Số lượng {$quantity} {$unit} là giá {$price} ({$price})";
-        }
+        // Đã tắt tự động tạo mô tả - cho phép người dùng tự nhập mô tả tùy ý
+        // Giữ nguyên description từ request (đã có trong $data)
 
         \Log::info('Updating product with data', ['data_keys' => array_keys($data)]);
         \Log::info('Image status', [

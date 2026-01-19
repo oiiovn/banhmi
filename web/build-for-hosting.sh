@@ -49,7 +49,7 @@ fi
 
 # Build
 echo "🏗️  Đang build Next.js..."
-npm run build
+BUILD_FOR_HOSTING=true npm run build
 
 if [ $? -eq 0 ]; then
     echo ""

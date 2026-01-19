@@ -28,7 +28,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   userScalable: true,
-  themeColor: '#f97316',
+  themeColor: '#ffffff',
 }
 
 export default function RootLayout({
@@ -43,6 +43,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Banhmi" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover" />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
       </head>
       <body className={inter.className}>

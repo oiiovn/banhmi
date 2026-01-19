@@ -9,7 +9,7 @@ import Modal from '@/components/Modal'
 
 export default function AdminAgentsPage() {
   const router = useRouter()
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, logout } = useAuthStore()
   const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -196,6 +196,15 @@ export default function AdminAgentsPage() {
               </Link>
               <span className="text-gray-500">|</span>
               <span className="text-sm text-gray-700">{user.name}</span>
+              <button
+                onClick={() => {
+                  logout()
+                  router.push('/login')
+                }}
+                className="text-gray-700 hover:text-primary-600 text-sm font-medium"
+              >
+                Đăng xuất
+              </button>
             </div>
           </div>
         </div>

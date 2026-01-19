@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store/authStore'
 import { authApi } from '@/lib/api/auth'
 import { agentApi, Order, AgentStats, Product } from '@/lib/api/agent'
 import AgentHeader from '@/components/AgentHeader'
 import Modal from '@/components/Modal'
+import { Toast, useToast } from '@/components/Toast'
 import Image from 'next/image'
+import { getImageUrl } from '@/lib/config'
 
 const ORDER_STATUSES = [
   { value: '', label: 'Tất cả' },
@@ -56,6 +58,8 @@ export default function AgentOrdersPage() {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
   const [availableProducts, setAvailableProducts] = useState<any[]>([])
   const [isHydrated, setIsHydrated] = useState(false)
+  const loadingRef = useRef(false)
+  const mountedRef = useRef(true)
   const [modal, setModal] = useState<{
     isOpen: boolean
     type: 'alert' | 'confirm'
@@ -69,6 +73,7 @@ export default function AgentOrdersPage() {
     type: 'alert',
     message: '',
   })
+  const toast = useToast()
 
   useEffect(() => {
     setIsHydrated(true)
@@ -88,37 +93,101 @@ export default function AgentOrdersPage() {
     }
   }, [isHydrated, isAuthenticated, user, router, viewMode, setViewMode])
 
-  useEffect(() => {
-    if (!isHydrated || !isAuthenticated || !user || user.role !== 'agent') return
-
-    authApi.getCurrentUser().catch(console.error)
-    fetchData()
-  }, [isHydrated, isAuthenticated, user?.id, selectedStatus])
-
   const fetchData = async () => {
+    if (!mountedRef.current) return
+    
     try {
-      setLoading(true)
       const [ordersRes, pendingRes, statsRes] = await Promise.all([
-        agentApi.getOrders(selectedStatus || undefined),
-        agentApi.getPendingOrders(),
-        agentApi.getDashboard(),
+        agentApi.getOrders(selectedStatus || undefined).catch((err) => {
+          console.error('❌ Error fetching orders:', err)
+          return { success: false, data: null }
+        }),
+        agentApi.getPendingOrders().catch((err) => {
+          console.error('❌ Error fetching pending orders:', err)
+          return { success: false, data: null }
+        }),
+        agentApi.getDashboard().catch((err) => {
+          console.error('❌ Error fetching dashboard:', err)
+          return { success: false, data: null }
+        }),
       ])
 
-      if (ordersRes.success && ordersRes.data) {
+      if (!mountedRef.current) return
+
+      if (ordersRes && ordersRes.success && ordersRes.data) {
         setOrders(ordersRes.data)
+      } else {
+        console.warn('⚠️ Orders data not available or failed')
       }
-      if (pendingRes.success && pendingRes.data) {
+      
+      if (pendingRes && pendingRes.success && pendingRes.data) {
         setPendingOrders(pendingRes.data)
+      } else {
+        console.warn('⚠️ Pending orders data not available or failed')
       }
-      if (statsRes.success && statsRes.data) {
+      
+      if (statsRes && statsRes.success && statsRes.data) {
         setStats(statsRes.data)
+      } else {
+        console.warn('⚠️ Stats data not available or failed')
       }
     } catch (error) {
-      console.error('Error fetching orders:', error)
-    } finally {
-      setLoading(false)
+      console.error('❌ Error in fetchData:', error)
     }
+    // KHÔNG set loading false ở đây - để useEffect finally block xử lý
   }
+
+  useEffect(() => {
+    mountedRef.current = true
+    
+    if (!isHydrated || !isAuthenticated || !user || user.role !== 'agent') {
+      setLoading(false)
+      loadingRef.current = false
+      return
+    }
+
+    authApi.getCurrentUser().catch(console.error)
+    
+    let timeoutId: NodeJS.Timeout | null = null
+    
+    const loadData = async () => {
+      if (!mountedRef.current) return
+      
+      loadingRef.current = true
+      setLoading(true)
+      
+      try {
+        await fetchData()
+      } catch (error) {
+        console.error('Error in loadData:', error)
+      } finally {
+        if (mountedRef.current) {
+          loadingRef.current = false
+          setLoading(false)
+        }
+      }
+    }
+    
+    // Timeout để tránh kẹt vô hạn
+    timeoutId = setTimeout(() => {
+      if (mountedRef.current && loadingRef.current) {
+        console.warn('⚠️ Loading timeout - forcing loading to false')
+        loadingRef.current = false
+        setLoading(false)
+      }
+    }, 10000) // 10 giây timeout
+    
+    loadData()
+    
+    return () => {
+      mountedRef.current = false
+      loadingRef.current = false
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHydrated, isAuthenticated, user?.id, selectedStatus])
 
   const handleAcceptOrder = async (orderId: number) => {
     // Mở modal chỉnh sửa thay vì nhận đơn ngay
@@ -133,12 +202,26 @@ export default function AgentOrdersPage() {
         }
       }
     } catch (error: any) {
-      setModal({
-        isOpen: true,
-        type: 'alert',
-        title: 'Lỗi',
-        message: 'Không thể tải chi tiết đơn hàng: ' + (error.response?.data?.message || error.message),
-      })
+      toast.error('Không thể tải chi tiết đơn hàng: ' + (error.response?.data?.message || error.message))
+    }
+  }
+
+  const handleEditOrderFromDetail = async (order: Order) => {
+    // Đóng modal chi tiết và mở modal chỉnh sửa
+    setSelectedOrder(null)
+    try {
+      // Chỉ có thể sửa các đơn hàng pending (chưa được nhận)
+      const response = await agentApi.getPendingOrder(order.id)
+      if (response.success) {
+        setEditingOrder(response.data)
+        // Load available products for selection
+        const productsRes = await agentApi.getProducts()
+        if (productsRes.success) {
+          setAvailableProducts(productsRes.data)
+        }
+      }
+    } catch (error: any) {
+      toast.error('Chỉ có thể chỉnh sửa đơn hàng chưa được nhận. ' + (error.response?.data?.message || error.message || ''))
     }
   }
 
@@ -156,29 +239,28 @@ export default function AgentOrdersPage() {
           item_id: item.id,
           product_id: item.product_id,
           quantity: item.quantity,
+          price: parseFloat(item.price || '0'), // Gửi giá để có thể sửa
         })),
         // New items without item_id
         ...newItems.map((item) => ({
           product_id: item.product_id,
           quantity: item.quantity,
+          price: parseFloat(item.price || '0'), // Gửi giá để có thể sửa
         })),
       ]
 
       const discount = parseFloat(editingOrder.discount || '0')
+      const notes = editingOrder.notes || ''
 
       const response = await agentApi.updateOrderBeforeAccept(editingOrder.id, {
         items,
         discount,
+        notes,
       })
 
       if (response.success) {
         setEditingOrder(response.data)
-        setModal({
-          isOpen: true,
-          type: 'alert',
-          title: 'Thành công',
-          message: 'Đã cập nhật đơn hàng!',
-        })
+        toast.success('Đã cập nhật đơn hàng!')
         // Reload pending orders to reflect changes
         const pendingRes = await agentApi.getPendingOrders()
         if (pendingRes.success) {
@@ -186,76 +268,60 @@ export default function AgentOrdersPage() {
         }
       }
     } catch (error: any) {
-      setModal({
-        isOpen: true,
-        type: 'alert',
-        title: 'Lỗi',
-        message: 'Không thể cập nhật đơn hàng: ' + (error.response?.data?.message || error.message),
-      })
+      toast.error('Không thể cập nhật đơn hàng: ' + (error.response?.data?.message || error.message))
     }
   }
 
   const handleConfirmAcceptOrder = async () => {
     if (!editingOrder) return
 
-    setModal({
-      isOpen: true,
-      type: 'confirm',
-      title: 'Xác nhận',
-      message: 'Bạn có chắc chắn muốn xác nhận nhận đơn hàng này?',
-      onConfirm: async () => {
-        try {
-          const response = await agentApi.acceptOrder(editingOrder!.id)
-          if (response.success) {
-            setModal({
-              isOpen: true,
-              type: 'alert',
-              title: 'Thành công',
-              message: 'Đã nhận đơn hàng thành công!',
-            })
-            setEditingOrder(null)
-            fetchData()
-          }
-        } catch (error: any) {
-          setModal({
-            isOpen: true,
-            type: 'alert',
-            title: 'Lỗi',
-            message: 'Không thể nhận đơn hàng: ' + (error.response?.data?.message || error.message),
-          })
-        }
-      },
-    })
+    try {
+      const notes = editingOrder.notes || ''
+      const response = await agentApi.acceptOrder(editingOrder.id, notes)
+      if (response.success) {
+        toast.success('Đã nhận đơn hàng thành công!')
+        setEditingOrder(null)
+        fetchData()
+      }
+    } catch (error: any) {
+      toast.error('Không thể nhận đơn hàng: ' + (error.response?.data?.message || error.message))
+    }
   }
 
   const handleUpdateStatus = async (orderId: number, newStatus: string) => {
+    try {
+      const response = await agentApi.updateOrderStatus(orderId, newStatus)
+      if (response.success) {
+        toast.success(`Đã cập nhật: ${STATUS_LABELS[newStatus]}`)
+        fetchData()
+        if (selectedOrder && selectedOrder.id === orderId) {
+          setSelectedOrder(response.data)
+        }
+      }
+    } catch (error: any) {
+      toast.error('Lỗi: ' + (error.response?.data?.message || error.message))
+    }
+  }
+  
+  // Hàm hủy đơn với xác nhận modal (vì đây là hành động quan trọng)
+  const handleCancelOrder = (orderId: number, closeDetailModal?: boolean) => {
     setModal({
       isOpen: true,
       type: 'confirm',
-      title: 'Xác nhận',
-      message: `Bạn có chắc chắn muốn cập nhật trạng thái đơn hàng thành "${STATUS_LABELS[newStatus]}"?`,
+      title: 'Xác nhận hủy đơn',
+      message: 'Bạn có chắc chắn muốn hủy đơn hàng này?',
       onConfirm: async () => {
         try {
-          const response = await agentApi.updateOrderStatus(orderId, newStatus)
+          const response = await agentApi.updateOrderStatus(orderId, 'cancelled')
           if (response.success) {
-            setModal({
-              isOpen: true,
-              type: 'alert',
-              title: 'Thành công',
-              message: 'Đã cập nhật trạng thái đơn hàng!',
-            })
+            toast.success('Đã hủy đơn hàng')
             fetchData()
-            if (selectedOrder && selectedOrder.id === orderId) {
-              setSelectedOrder(response.data)
+            if (closeDetailModal) {
+              setSelectedOrder(null)
             }
           }
         } catch (error: any) {
-          setModal({
-            isOpen: true,
-            type: 'alert',
-            title: 'Lỗi',
-            message: 'Không thể cập nhật trạng thái: ' + (error.response?.data?.message || error.message),
-          })
+          toast.error('Lỗi: ' + (error.response?.data?.message || error.message))
         }
       },
     })
@@ -316,7 +382,7 @@ export default function AgentOrdersPage() {
 
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
           <p className="text-gray-600">Đang tải...</p>
@@ -325,95 +391,109 @@ export default function AgentOrdersPage() {
     )
   }
 
+  // Hiển thị loading khi đang kiểm tra authentication thay vì return null
   if (!isAuthenticated || !user || user.role !== 'agent') {
-    return null
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
+          <p className="text-gray-600">Đang kiểm tra quyền truy cập...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <AgentHeader />
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Quản lý đơn hàng</h1>
+      <div className="container mx-auto px-4 py-4 pb-20">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-xl font-bold text-gray-900">Quản lý đơn hàng</h1>
         </div>
 
-        {/* Statistics Cards */}
+        {/* Statistics Pills - Horizontal Scrollable */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-            <div
-              onClick={() => setSelectedStatus('')}
-              className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition hover:shadow-lg ${
-                selectedStatus === '' ? 'ring-2 ring-primary-600' : ''
-              }`}
-            >
-              <div className="text-sm font-medium text-gray-500 mb-1">Tất cả</div>
-              <div className="text-2xl font-bold text-gray-900">
-                {stats.total_orders + pendingOrders.length}
-              </div>
-            </div>
-            <div
-              onClick={() => setSelectedStatus('new')}
-              className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition hover:shadow-lg ${
-                selectedStatus === 'new' ? 'ring-2 ring-purple-600' : ''
-              }`}
-            >
-              <div className="text-sm font-medium text-gray-500 mb-1">Đơn mới</div>
-              <div className="text-2xl font-bold text-purple-600">{pendingOrders.length}</div>
-            </div>
-            <div
-              onClick={() => setSelectedStatus('confirmed')}
-              className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition hover:shadow-lg ${
-                selectedStatus === 'confirmed' ? 'ring-2 ring-blue-600' : ''
-              }`}
-            >
-              <div className="text-sm font-medium text-gray-500 mb-1">Đã xác nhận</div>
-              <div className="text-2xl font-bold text-blue-600">{stats.confirmed_orders}</div>
-            </div>
-            <div
-              onClick={() => setSelectedStatus('preparing')}
-              className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition hover:shadow-lg ${
-                selectedStatus === 'preparing' ? 'ring-2 ring-orange-600' : ''
-              }`}
-            >
-              <div className="text-sm font-medium text-gray-500 mb-1">Đang giao</div>
-              <div className="text-2xl font-bold text-orange-600">{stats.preparing_orders}</div>
-            </div>
-            <div
-              onClick={() => setSelectedStatus('delivered')}
-              className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition hover:shadow-lg ${
-                selectedStatus === 'delivered' ? 'ring-2 ring-gray-600' : ''
-              }`}
-            >
-              <div className="text-sm font-medium text-gray-500 mb-1">Đã giao</div>
-              <div className="text-2xl font-bold text-gray-600">{stats.delivered_orders}</div>
+          <div className="mb-4 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-2 pb-2 min-w-max">
+              <button
+                onClick={() => setSelectedStatus('')}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
+                  selectedStatus === ''
+                    ? 'bg-primary-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                Tất cả <span className="ml-1 font-bold">{stats.total_orders + pendingOrders.length}</span>
+              </button>
+              <button
+                onClick={() => setSelectedStatus('new')}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
+                  selectedStatus === 'new'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                Đơn mới <span className="ml-1 font-bold">{pendingOrders.length}</span>
+              </button>
+              <button
+                onClick={() => setSelectedStatus('confirmed')}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
+                  selectedStatus === 'confirmed'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                Đã xác nhận <span className="ml-1 font-bold">{stats.confirmed_orders}</span>
+              </button>
+              <button
+                onClick={() => setSelectedStatus('preparing')}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
+                  selectedStatus === 'preparing'
+                    ? 'bg-orange-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                Đang giao <span className="ml-1 font-bold">{stats.preparing_orders}</span>
+              </button>
+              <button
+                onClick={() => setSelectedStatus('delivered')}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
+                  selectedStatus === 'delivered'
+                    ? 'bg-gray-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                Đã giao <span className="ml-1 font-bold">{stats.delivered_orders}</span>
+              </button>
             </div>
           </div>
         )}
 
         {/* Pending Orders (chưa có agent) */}
         {pendingOrders.length > 0 && (selectedStatus === '' || selectedStatus === 'new') && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <h2 className="text-lg font-semibold text-yellow-900 mb-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+            <h2 className="text-sm font-bold text-yellow-900 mb-2">
               Đơn hàng chờ nhận ({pendingOrders.length})
             </h2>
-            <div className="space-y-4">
+            <div className="space-y-2">
               {pendingOrders.map((order) => (
                 <div
                   key={order.id}
-                  className="bg-white rounded-lg shadow p-4 flex justify-between items-center"
+                  className="bg-white rounded-lg shadow-sm p-3 flex justify-between items-center gap-3"
                 >
-                  <div>
-                    <p className="font-medium text-gray-900">Đơn hàng #{order.id}</p>
-                    <p className="text-sm text-gray-600">Khách hàng: {order.user.name}</p>
-                    <p className="text-sm text-gray-600">Tổng tiền: {formatPrice(order.total_amount)}</p>
-                    <p className="text-xs text-gray-500">Ngày đặt: {formatDate(order.created_at)}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-gray-900">Đơn #{order.id}</p>
+                    <p className="text-xs text-gray-600 truncate">{order.user.name}</p>
+                    <p className="text-xs font-bold text-primary-600 mt-1">
+                      {formatPrice(order.total_amount)}
+                    </p>
                   </div>
                   <button
                     onClick={() => handleAcceptOrder(order.id)}
-                    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition font-medium"
+                    className="bg-primary-600 text-white px-3 py-1.5 rounded-lg hover:bg-primary-700 transition text-xs font-medium whitespace-nowrap"
                   >
-                    Nhận đơn hàng
+                    Nhận đơn
                   </button>
                 </div>
               ))}
@@ -471,114 +551,88 @@ export default function AgentOrdersPage() {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Mã đơn
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Khách hàng
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
-                      Sản phẩm
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tổng tiền
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Thao tác
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 text-sm font-medium text-gray-900">
-                        <div>
-                          <span>#{order.id}</span>
-                          <p className="text-[10px] text-gray-400 mt-0.5">
-                            {formatDate(order.created_at)}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div>
-                          <p className="font-medium text-gray-900">{order.user.name}</p>
-                          <p className="text-xs text-gray-500">{order.user.phone || order.phone}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-500">
-                        <div className="max-w-full">
-                          <p className="font-medium text-gray-900">
-                            {order.items.length} sản phẩm
-                          </p>
-                          <div className="text-xs text-gray-500 space-y-1 mt-1">
-                            {order.items.map((item) => (
-                              <p key={item.id} className="line-clamp-1">
-                                {formatQuantityWithUnit(item)}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+          <div className="space-y-3">
+            {orders.map((order) => (
+              <div
+                key={order.id}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition"
+              >
+                {/* Header */}
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-bold text-gray-900">Đơn #{order.id}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {getStatusLabel(order.status, order)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {new Date(order.created_at).toLocaleString('vi-VN', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+
+                {/* Content */}
+                <div className="p-3">
+                  {/* Customer Info & Total */}
+                  <div className="mb-3 pb-3 border-b border-gray-100 flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 mb-1">{order.user.name}</p>
+                      {order.user.phone || order.phone ? (
+                        <p className="text-xs text-gray-600">{order.user.phone || order.phone}</p>
+                      ) : null}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500 mb-0.5">Tổng tiền</p>
+                      <p className="text-base font-bold text-primary-600">
                         {formatPrice(order.total_amount)}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex flex-col gap-2">
-                          <span
-                            className={`px-3 py-1.5 inline-flex text-sm leading-5 font-bold rounded-lg w-fit ${
-                              STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {getStatusLabel(order.status, order)}
-                          </span>
-                          <div className="flex gap-2 flex-wrap">
-                            <button
-                              onClick={() => setSelectedOrder(order)}
-                              className="text-primary-600 hover:text-primary-900 text-xs"
-                            >
-                              Chi tiết
-                            </button>
-                            {NEXT_STATUS[order.status] && (
-                              <button
-                                onClick={() => handleUpdateStatus(order.id, NEXT_STATUS[order.status]!)}
-                                className="text-green-600 hover:text-green-900 text-xs"
-                              >
-                                {order.status === 'pending' && 'Xác nhận đơn'}
-                                {order.status === 'confirmed' && 'Bắt đầu giao'}
-                                {(order.status === 'preparing' || order.status === 'ready') && 'Xác nhận đã giao'}
-                              </button>
-                            )}
-                            {order.status !== 'delivered' && order.status !== 'cancelled' && (
-                              <button
-                                onClick={() => {
-                                  setModal({
-                                    isOpen: true,
-                                    type: 'confirm',
-                                    title: 'Xác nhận hủy đơn',
-                                    message: 'Bạn có chắc chắn muốn hủy đơn hàng này?',
-                                    onConfirm: () => {
-                                      handleUpdateStatus(order.id, 'cancelled')
-                                    },
-                                  })
-                                }}
-                                className="text-red-600 hover:text-red-900 text-xs"
-                              >
-                                Hủy đơn
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 flex-wrap justify-end">
+                    <button
+                      onClick={() => setSelectedOrder(order)}
+                      className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-xs font-medium transition"
+                    >
+                      Chi tiết
+                    </button>
+                    {NEXT_STATUS[order.status] && (
+                      <button
+                        onClick={() => handleUpdateStatus(order.id, NEXT_STATUS[order.status]!)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                          order.status === 'pending'
+                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            : order.status === 'confirmed'
+                            ? 'bg-purple-600 text-white hover:bg-purple-700'
+                            : 'bg-green-600 text-white hover:bg-green-700'
+                        }`}
+                      >
+                        {order.status === 'pending' && '✓ Xác nhận đơn'}
+                        {order.status === 'confirmed' && '🚚 Bắt đầu giao'}
+                        {(order.status === 'preparing' || order.status === 'ready') && '✓ Xác nhận đã giao'}
+                      </button>
+                    )}
+                    {order.status !== 'delivered' && order.status !== 'cancelled' && (
+                      <button
+                        onClick={() => handleCancelOrder(order.id)}
+                        className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-medium transition"
+                      >
+                        ✕ Hủy đơn
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -618,9 +672,8 @@ export default function AgentOrdersPage() {
                   <h4 className="font-semibold text-gray-900 mb-2">Thông tin khách hàng</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <p><span className="font-medium">Tên:</span> {editingOrder.user.name}</p>
-                    <p><span className="font-medium">Email:</span> {editingOrder.user.email}</p>
                     <p><span className="font-medium">SĐT:</span> {editingOrder.user.phone || editingOrder.phone}</p>
-                    <p><span className="font-medium">Địa chỉ:</span> {editingOrder.delivery_address}</p>
+                    <p className="col-span-2"><span className="font-medium">Địa chỉ:</span> {editingOrder.delivery_address}</p>
                     {editingOrder.notes && (
                       <p className="col-span-2"><span className="font-medium">Ghi chú:</span> {editingOrder.notes}</p>
                     )}
@@ -691,13 +744,32 @@ export default function AgentOrdersPage() {
                           </select>
                         </div>
                         <div className="flex items-center gap-2">
+                          <label className="text-sm text-gray-600">Giá:</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1000"
+                            value={parseFloat(item.price || '0')}
+                            onChange={(e) => {
+                              const price = parseFloat(e.target.value) || 0
+                              if (editingOrder) {
+                                const newItems = [...editingOrder.items]
+                                newItems[index] = { ...newItems[index], price: price.toString() }
+                                setEditingOrder({ ...editingOrder, items: newItems })
+                              }
+                            }}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
                           <label className="text-sm text-gray-600">Số lượng:</label>
                           <input
                             type="number"
-                            min="1"
+                            min="0.1"
+                            step="0.1"
                             value={item.quantity}
                             onChange={(e) => {
-                              const quantity = parseInt(e.target.value) || 1
+                              const quantity = parseFloat(e.target.value) || 0.1
                               if (editingOrder) {
                                 const newItems = [...editingOrder.items]
                                 newItems[index] = { ...newItems[index], quantity }
@@ -740,6 +812,22 @@ export default function AgentOrdersPage() {
                       setEditingOrder({ ...editingOrder, discount: discount.toString() })
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ghi chú
+                  </label>
+                  <textarea
+                    value={editingOrder.notes || ''}
+                    onChange={(e) => {
+                      setEditingOrder({ ...editingOrder, notes: e.target.value })
+                    }}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Nhập ghi chú cho đơn hàng..."
                   />
                 </div>
 
@@ -818,17 +906,17 @@ export default function AgentOrdersPage() {
               onClick={() => setSelectedOrder(null)}
             ></div>
 
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-2xl font-bold text-gray-900">
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+              <div className="bg-white px-4 pt-4 pb-4 sm:p-4 sm:pb-4">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-lg font-bold text-gray-900">
                     Chi tiết đơn hàng #{selectedOrder.id}
                   </h3>
                   <button
                     onClick={() => setSelectedOrder(null)}
                     className="text-gray-400 hover:text-gray-600"
                   >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -839,16 +927,13 @@ export default function AgentOrdersPage() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="grid grid-cols-2 gap-3 mb-4">
                   {/* Customer Info */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3">Thông tin khách hàng</h4>
-                    <div className="space-y-2 text-sm">
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <h4 className="text-xs font-semibold text-gray-900 mb-2">Thông tin khách hàng</h4>
+                    <div className="space-y-1 text-xs">
                       <p>
                         <span className="font-medium">Tên:</span> {selectedOrder.user.name}
-                      </p>
-                      <p>
-                        <span className="font-medium">Email:</span> {selectedOrder.user.email}
                       </p>
                       <p>
                         <span className="font-medium">SĐT:</span> {selectedOrder.user.phone || selectedOrder.phone}
@@ -865,13 +950,13 @@ export default function AgentOrdersPage() {
                   </div>
 
                   {/* Order Info */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3">Thông tin đơn hàng</h4>
-                    <div className="space-y-2 text-sm">
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <h4 className="text-xs font-semibold text-gray-900 mb-2">Thông tin đơn hàng</h4>
+                    <div className="space-y-1 text-xs">
                       <p>
                         <span className="font-medium">Trạng thái:</span>{' '}
                         <span
-                          className={`px-3 py-1.5 inline-flex text-sm leading-5 font-bold rounded-lg ${
+                          className={`px-2 py-0.5 inline-flex text-xs leading-4 font-medium rounded ${
                             STATUS_COLORS[selectedOrder.status] || 'bg-gray-100 text-gray-800'
                           }`}
                         >
@@ -880,14 +965,14 @@ export default function AgentOrdersPage() {
                       </p>
                       <p>
                         <span className="font-medium">Tổng tiền:</span>{' '}
-                        <span className="text-lg font-bold text-primary-600">
+                        <span className="text-sm font-bold text-primary-600">
                           {formatPrice(selectedOrder.total_amount)}
                         </span>
                       </p>
                       {selectedOrder.profit !== undefined && (
                         <p>
                           <span className="font-medium">Lợi nhuận:</span>{' '}
-                          <span className="text-lg font-bold text-purple-600">
+                          <span className="text-sm font-bold text-purple-600">
                             {formatPrice(selectedOrder.profit)}
                           </span>
                         </p>
@@ -903,35 +988,39 @@ export default function AgentOrdersPage() {
                 </div>
 
                 {/* Order Items */}
-                <div className="mb-6">
-                  <h4 className="font-semibold text-gray-900 mb-3">Sản phẩm</h4>
-                  <div className="space-y-3">
+                <div className="mb-4">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Sản phẩm</h4>
+                  <div className="space-y-2">
                     {selectedOrder.items.map((item) => (
                       <div
                         key={item.id}
-                        className="flex gap-4 p-4 bg-gray-50 rounded-lg"
+                        className="flex gap-3 p-2 bg-gray-50 rounded-lg"
                       >
-                        {item.product.image ? (
+                        {getImageUrl(item.product.image) ? (
                           <Image
-                            src={item.product.image}
+                            src={getImageUrl(item.product.image)!}
                             alt={item.product.name}
-                            width={80}
-                            height={80}
-                            className="w-20 h-20 object-cover rounded-lg"
+                            width={50}
+                            height={50}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none'
+                              ;(e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden')
+                            }}
+                            className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
                           />
                         ) : (
-                          <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center">
-                            <span className="text-2xl">🍞</span>
+                          <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <span className="text-lg">🍞</span>
                           </div>
                         )}
-                        <div className="flex-grow">
-                          <h5 className="font-medium text-gray-900">{item.product.name}</h5>
-                          <p className="text-sm text-gray-600">
+                        <div className="flex-grow min-w-0">
+                          <h5 className="text-sm font-medium text-gray-900 truncate">{item.product.name}</h5>
+                          <p className="text-xs text-gray-600">
                             {formatQuantityWithUnit(item)}
                           </p>
-                          <p className="text-sm text-gray-600">
-                            Giá: {formatPrice(item.price)} × {item.quantity} ={' '}
-                            {formatPrice(calculateItemTotal(item))}
+                          <p className="text-xs text-gray-600">
+                            {formatPrice(item.price)} × {item.quantity} ={' '}
+                            <span className="font-medium">{formatPrice(calculateItemTotal(item))}</span>
                           </p>
                         </div>
                       </div>
@@ -940,28 +1029,26 @@ export default function AgentOrdersPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex justify-end gap-3">
+                <div className="flex justify-end gap-2">
                   <button
                     onClick={() => setSelectedOrder(null)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition font-medium"
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition text-sm font-medium"
                   >
                     Đóng
                   </button>
+                  {/* Chỉ hiển thị nút Sửa đơn cho các đơn hàng pending (chưa được nhận hoặc đã nhận nhưng vẫn có thể sửa) */}
+                  {selectedOrder.status === 'pending' && (
+                    <button
+                      onClick={() => handleEditOrderFromDetail(selectedOrder)}
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+                    >
+                      Sửa đơn
+                    </button>
+                  )}
                   {selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' && (
                     <button
-                      onClick={() => {
-                        setModal({
-                          isOpen: true,
-                          type: 'confirm',
-                          title: 'Xác nhận hủy đơn',
-                          message: 'Bạn có chắc chắn muốn hủy đơn hàng này?',
-                          onConfirm: () => {
-                            handleUpdateStatus(selectedOrder.id, 'cancelled')
-                            setSelectedOrder(null)
-                          },
-                        })
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
+                      onClick={() => handleCancelOrder(selectedOrder.id, true)}
+                      className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium"
                     >
                       Hủy đơn
                     </button>
@@ -972,7 +1059,7 @@ export default function AgentOrdersPage() {
                         handleUpdateStatus(selectedOrder.id, NEXT_STATUS[selectedOrder.status]!)
                         setSelectedOrder(null)
                       }}
-                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-medium"
+                      className="px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm font-medium"
                     >
                       {selectedOrder.status === 'confirmed' && 'Bắt đầu giao'}
                       {(selectedOrder.status === 'preparing' || selectedOrder.status === 'ready') && 'Đã giao'}
@@ -985,7 +1072,7 @@ export default function AgentOrdersPage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal - chỉ dùng cho hủy đơn */}
       <Modal
         isOpen={modal.isOpen}
         onClose={() => setModal({ ...modal, isOpen: false })}
@@ -996,6 +1083,9 @@ export default function AgentOrdersPage() {
         confirmText={modal.confirmText}
         cancelText={modal.cancelText}
       />
+
+      {/* Toast notifications */}
+      <Toast toasts={toast.toasts} onRemove={toast.removeToast} />
     </div>
   )
 }

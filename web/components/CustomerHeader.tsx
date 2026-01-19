@@ -46,17 +46,29 @@ export default function CustomerHeader() {
   }
 
   if (!isHydrated) {
-    return null
+    return (
+      <header className="bg-white shadow-md sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              {/* Loading state */}
+            </div>
+            <nav className="flex gap-4 items-center">
+              <div className="h-6 w-20 bg-gray-200 rounded animate-pulse"></div>
+            </nav>
+          </div>
+        </div>
+      </header>
+    )
   }
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
         <div className="flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-3xl">🍞</span>
-            <h1 className="text-2xl font-bold text-primary-600">Banhmi</h1>
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* Logo removed */}
+          </div>
           <nav className="flex gap-4 items-center">
             {isAuthenticated && user ? (
               <>

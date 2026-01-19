@@ -35,9 +35,7 @@ API sẽ chạy tại `http://localhost:8000`
 
 - **Admin**: Quản lý toàn bộ hệ thống (đại lý, sản phẩm, đơn hàng)
 - **Đại lý (Agent)**: Quản lý đơn hàng được phân công, cập nhật trạng thái đơn hàng
-- **Khách hàng (Customer)**: Đặt hàng và xem đơn hàng của mình## API Endpoints
-
-### Authentication (Public)
+- **Khách hàng (Customer)**: Đặt hàng và xem đơn hàng của mình## API Endpoints### Authentication (Public)
 - `POST /api/register` - Đăng ký tài khoản khách hàng mới
 - `POST /api/login` - Đăng nhập (trả về role của user)
 - `POST /api/logout` - Đăng xuất (yêu cầu authentication)

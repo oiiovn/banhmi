@@ -9,6 +9,7 @@ import { useCartStore } from '@/lib/store/cartStore'
 import Image from 'next/image'
 import CustomerHeader from '@/components/CustomerHeader'
 import api from '@/lib/api'
+import { getImageUrl } from '@/lib/config'
 
 interface Category {
   id: number
@@ -45,9 +46,12 @@ export default function Home() {
   const [isHydrated, setIsHydrated] = useState(false)
   const [pendingConfirmOrders, setPendingConfirmOrders] = useState<any[]>([])
   const [showNotification, setShowNotification] = useState(true)
+  const [renderError, setRenderError] = useState<Error | null>(null)
 
   // Wait for auth store to hydrate from localStorage
   useEffect(() => {
+    // Set hydrated ngay lập tức để trang có thể render
+    // Không cần chờ auth store hydrate vì Zustand tự động hydrate
     setIsHydrated(true)
   }, [])
 
@@ -64,14 +68,88 @@ export default function Home() {
   }, [isAuthenticated, user, router, viewMode, setViewMode])
 
   useEffect(() => {
-    fetchCategories()
-    fetchProducts()
+    // Đảm bảo loading được set về false ngay sau khi mount
+    // để trang có thể hiển thị ngay, không bị kẹt loading
+    const isLocal = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1'
+    )
+    
+    let timeoutId: NodeJS.Timeout | null = null
+    let mounted = true
+
+    const loadData = async () => {
+      try {
+        console.log('🔄 [page.tsx] loadData started')
+        // Gọi cả hai API, nhưng không block nếu một trong hai lỗi
+        const results = await Promise.allSettled([
+          fetchCategories(),
+          fetchProducts()
+        ])
+        
+        // Log kết quả để debug
+        results.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.error(`❌ API call ${index === 0 ? 'categories' : 'products'} failed:`, result.reason)
+          } else {
+            console.log(`✅ API call ${index === 0 ? 'categories' : 'products'} succeeded`)
+          }
+        })
+      } catch (error) {
+        console.error('❌ Error loading data:', error)
+      } finally {
+        // Đảm bảo loading luôn được set về false, ngay cả khi API lỗi
+        console.log('🔄 [page.tsx] loadData finally - setting loading to false')
+        if (mounted) {
+          setLoading(false)
+        }
+        // Clear timeout nếu API call hoàn thành trước timeout
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
+      }
+    }
+    
+    // Thêm timeout để tránh kẹt loading vô hạn (chỉ trên local)
+    if (isLocal) {
+      timeoutId = setTimeout(() => {
+        console.warn('⚠️ [LOCAL] Loading timeout (3s) - forcing loading to false')
+        if (mounted) {
+          setLoading(false)
+        }
+      }, 3000) // 3 giây timeout cho local
+    } else {
+      // Trên production, timeout sau 10 giây
+      timeoutId = setTimeout(() => {
+        console.warn('⚠️ [PROD] Loading timeout (10s) - forcing loading to false')
+        if (mounted) {
+          setLoading(false)
+        }
+      }, 10000) // 10 giây timeout cho production
+    }
+    
+    // Gọi loadData ngay khi mount, không phụ thuộc vào isAuthenticated
+    loadData().catch((err) => {
+      console.error('❌ loadData promise rejected:', err)
+      if (mounted) {
+        setLoading(false)
+      }
+    })
+    
     // Refresh user data to get latest role
     if (isAuthenticated) {
       authApi.getCurrentUser().catch(console.error)
-      fetchPendingConfirmOrders()
+      fetchPendingConfirmOrders().catch(console.error)
     }
-  }, [isAuthenticated])
+
+    return () => {
+      mounted = false
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const fetchPendingConfirmOrders = async () => {
     try {
@@ -91,24 +169,44 @@ export default function Home() {
       if (response.data.success) {
         setCategories(response.data.data)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching categories:', error)
+      // Không throw error để không block page load
+      if (error.response?.status === 401) {
+        // Unauthorized - có thể do token hết hạn, nhưng vẫn cho phép xem trang
+        console.warn('⚠️ Unauthorized - token may be expired')
+      }
     }
   }
 
   const fetchProducts = async (categoryId?: number) => {
     try {
-      setLoading(true)
+      // Chỉ set loading khi fetch với category filter (không set khi initial load)
+      if (categoryId !== undefined) {
+        setLoading(true)
+      }
       const params = categoryId ? { category_id: categoryId } : {}
       // Sử dụng api từ lib/api để tự động gửi token nếu có
       const response = await api.get('/products', { params })
       if (response.data.success) {
         setProducts(response.data.data)
+      } else {
+        console.warn('⚠️ API returned success=false:', response.data)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching products:', error)
+      // Hiển thị lỗi nhưng vẫn cho phép xem trang
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        console.error('❌ Network error - API không thể kết nối')
+      } else if (error.response?.status === 401) {
+        console.warn('⚠️ Unauthorized - token may be expired')
+      }
     } finally {
-      setLoading(false)
+      // Set loading false khi fetch với category filter
+      // KHÔNG set khi initial load vì loadData() sẽ set trong finally block
+      if (categoryId !== undefined) {
+        setLoading(false)
+      }
     }
   }
 
@@ -141,7 +239,7 @@ export default function Home() {
   // Don't render until hydrated to avoid flash
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
           <p className="text-gray-600">Đang tải...</p>
@@ -150,13 +248,41 @@ export default function Home() {
     )
   }
 
+  // Error boundary - hiển thị error thay vì crash
+  if (renderError) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <h2 className="text-xl font-bold text-red-600 mb-2">Đã xảy ra lỗi!</h2>
+          <p className="text-gray-600 mb-4">{renderError.message}</p>
+          <button
+            onClick={() => {
+              setRenderError(null)
+              window.location.reload()
+            }}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            Tải lại trang
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // Don't show customer home if user is admin (they will be redirected)
   if (isAuthenticated && user && user.role === 'admin') {
-    return null
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
+          <p className="text-gray-600">Đang chuyển hướng...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <CustomerHeader />
 
       {/* Notification Banner - Đơn hàng chờ xác nhận */}
@@ -272,12 +398,34 @@ export default function Home() {
                 key={product.id}
                 className="bg-white rounded-md shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 transform hover:-translate-y-0.5 flex flex-col h-full"
               >
-                <div className="relative w-full aspect-square bg-gray-100">
-                  {product.image ? (
+                <div className="relative w-full aspect-square bg-gray-100 flex-shrink-0 overflow-hidden">
+                  {getImageUrl(product.image) ? (
                     <img
-                      src={product.image}
+                      src={getImageUrl(product.image)!}
                       alt={product.name}
                       className="w-full h-full object-cover rounded-t-md"
+                      style={{ aspectRatio: '1 / 1', objectFit: 'cover' }}
+                      loading="lazy"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement
+                        console.error('❌ Lỗi load ảnh:', {
+                          src: img.src,
+                          original: product.image,
+                          productName: product.name,
+                          productId: product.id
+                        })
+                        // Không ẩn ảnh, chỉ log lỗi để debug
+                        // img.style.display = 'none'
+                        // img.nextElementSibling?.classList.remove('hidden')
+                      }}
+                      onLoad={() => {
+                        if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+                          console.log('✅ Load ảnh thành công:', {
+                            src: getImageUrl(product.image),
+                            productName: product.name
+                          })
+                        }
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400 rounded-t-md">
@@ -359,47 +507,6 @@ export default function Home() {
         )}
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-6 md:py-12 mt-8 md:mt-16">
-        <div className="container mx-auto px-2 md:px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
-            <div>
-              <h3 className="text-base md:text-xl font-bold mb-2 md:mb-4">🍞 Banhmi</h3>
-              <p className="text-gray-400 text-sm md:text-base">
-                Đặt hàng bánh mì ngon, nhanh chóng và tiện lợi
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-2 md:mb-4 text-sm md:text-base">Liên kết</h4>
-              <ul className="space-y-1 md:space-y-2 text-gray-400 text-sm md:text-base">
-                <li>
-                  <Link href="/" className="hover:text-white">
-                    Trang chủ
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/register-agent" className="hover:text-white">
-                    Đăng ký Đại lý
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/orders" className="hover:text-white">
-                    Đơn hàng
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-2 md:mb-4 text-sm md:text-base">Liên hệ</h4>
-              <p className="text-gray-400 text-sm md:text-base">Email: support@banhmi.com</p>
-              <p className="text-gray-400 text-sm md:text-base">Hotline: 1900-xxxx</p>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 mt-4 md:mt-8 pt-4 md:pt-8 text-center text-gray-400 text-xs md:text-sm">
-            <p>&copy; 2024 Banhmi. Tất cả quyền được bảo lưu.</p>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }

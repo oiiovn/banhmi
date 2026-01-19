@@ -8,7 +8,7 @@ import { adminApi } from '@/lib/api/admin'
 
 export default function AdminDashboardPage() {
   const router = useRouter()
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, logout } = useAuthStore()
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isHydrated, setIsHydrated] = useState(false)
@@ -76,6 +76,15 @@ export default function AdminDashboardPage() {
               </Link>
               <span className="text-gray-500">|</span>
               <span className="text-sm text-gray-700">{user.name}</span>
+              <button
+                onClick={() => {
+                  logout()
+                  router.push('/login')
+                }}
+                className="text-gray-700 hover:text-primary-600 text-sm font-medium"
+              >
+                Đăng xuất
+              </button>
             </div>
           </div>
         </div>

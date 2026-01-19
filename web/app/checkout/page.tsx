@@ -19,17 +19,19 @@ export default function CheckoutPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [orderSuccess, setOrderSuccess] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login')
       return
     }
-    if (items.length === 0) {
+    // Chỉ redirect về trang chủ nếu không có items, không đang submit và chưa đặt hàng thành công
+    if (items.length === 0 && !isSubmitting && !orderSuccess) {
       router.push('/')
       return
     }
-  }, [isAuthenticated, items, router])
+  }, [isAuthenticated, items, router, isSubmitting, orderSuccess])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -79,33 +81,51 @@ export default function CheckoutPage() {
 
       const results = await Promise.all(orderPromises)
       
+      // Log results để debug
+      console.log('Order creation results:', results)
+      
       // Kiểm tra xem tất cả đơn hàng đã được tạo thành công chưa
       const allSuccess = results.every((result) => result.success)
       
       if (allSuccess) {
+        // Đánh dấu đặt hàng thành công trước khi redirect (để useEffect không redirect về trang chủ)
+        setOrderSuccess(true)
+        // Clear cart
         clearCart()
-        router.push('/orders')
+        // Dùng window.location.href để redirect ngay lập tức, tránh bị chặn
+        window.location.href = '/orders'
       } else {
-        const failedCount = results.filter((r) => !r.success).length
+        // Tìm lỗi chi tiết từ results
+        const failedResults = results.filter((r) => !r.success)
+        console.error('Failed order creation:', failedResults)
+        
+        const errorMessages = failedResults.map((r: any) => {
+          if (r.error) return r.error
+          if (r.message) return r.message
+          return 'Lỗi không xác định'
+        }).join('; ')
+        
+        const failedCount = failedResults.length
         setErrorMessage(
-          `Không thể tạo ${failedCount} đơn hàng. Vui lòng thử lại.`
+          `Không thể tạo ${failedCount} đơn hàng. ${errorMessages || 'Vui lòng thử lại.'}`
         )
       }
     } catch (error: any) {
-      setErrorMessage(
-        error.response?.data?.message || 'Không thể tạo đơn hàng. Vui lòng thử lại.'
-      )
+      console.error('Order creation error:', error)
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Không thể tạo đơn hàng. Vui lòng thử lại.'
+      setErrorMessage(errorMessage)
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  if (!isAuthenticated || items.length === 0) {
+  // Chỉ return null nếu không đang submit và chưa đặt hàng thành công (để tránh chặn redirect sau khi đặt hàng thành công)
+  if (!isAuthenticated || (items.length === 0 && !isSubmitting && !orderSuccess)) {
     return null
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <CustomerHeader />
 
       <div className="container mx-auto px-4 py-8">

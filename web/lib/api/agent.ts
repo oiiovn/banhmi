@@ -117,16 +117,18 @@ export const agentApi = {
         item_id?: number
         product_id: number
         quantity: number
+        price?: number
       }>
       discount?: number
+      notes?: string
     }
   ): Promise<{ success: boolean; data: Order; message: string }> => {
     const response = await api.put(`/agent/orders/${id}/edit`, data)
     return response.data
   },
 
-  acceptOrder: async (id: number): Promise<{ success: boolean; data: Order; message: string }> => {
-    const response = await api.post(`/agent/orders/${id}/accept`)
+  acceptOrder: async (id: number, notes?: string): Promise<{ success: boolean; data: Order; message: string }> => {
+    const response = await api.post(`/agent/orders/${id}/accept`, notes ? { notes } : {})
     return response.data
   },
 
@@ -260,6 +262,45 @@ export const agentApi = {
     const response = await api.post(`/agent/payments/${id}/reject`)
     return response.data
   },
+
+  // Tìm công nợ đối ứng cho bù trừ
+  findOppositeDebt: async (debtId: number): Promise<{ 
+    success: boolean; 
+    data: { 
+      current_debt: Debt; 
+      opposite_debt: Debt | null; 
+      can_offset: boolean 
+    } 
+  }> => {
+    const response = await api.get(`/agent/debts/${debtId}/opposite`)
+    return response.data
+  },
+
+  // Debt Transfers
+  createDebtTransfer: async (data: {
+    from_debt_id: number
+    to_debt_id: number
+    amount: number
+    description?: string
+  }): Promise<{ success: boolean; data: DebtTransfer; message: string }> => {
+    const response = await api.post('/agent/debts/transfer', data)
+    return response.data
+  },
+
+  getPendingDebtTransfers: async (): Promise<{ success: boolean; data: DebtTransfer[] }> => {
+    const response = await api.get('/agent/debts/transfers/pending')
+    return response.data
+  },
+
+  confirmDebtTransfer: async (id: number): Promise<{ success: boolean; data: DebtTransfer; message: string }> => {
+    const response = await api.post(`/agent/debts/transfers/${id}/confirm`)
+    return response.data
+  },
+
+  rejectDebtTransfer: async (id: number): Promise<{ success: boolean; data: DebtTransfer; message: string }> => {
+    const response = await api.post(`/agent/debts/transfers/${id}/reject`)
+    return response.data
+  },
 }
 
 export interface CategoryData {
@@ -347,6 +388,8 @@ export interface Debt {
     email: string
   }
   payments?: Payment[]
+  can_offset?: boolean // Có thể bù trừ công nợ không (nợ ít hơn đối tác)
+  has_pending_transfer?: boolean // Đã có yêu cầu bù trừ đang chờ xác nhận
 }
 
 export interface DebtStats {
@@ -359,13 +402,39 @@ export interface DebtStats {
   paid_count: number
 }
 
+export interface DebtTransfer {
+  id: number
+  // Standardized data model
+  party_a_id: number        // Initiator ID
+  party_b_id: number        // Partner ID
+  party_a_name: string      // Initiator name
+  party_b_name: string      // Partner name
+  a_owed_before: number     // A nợ B trước bù trừ
+  b_owed_before: number     // B nợ A trước bù trừ
+  offset_amount: number     // Số tiền bù trừ
+  a_owed_after: number      // A còn nợ B sau bù trừ
+  b_owed_after: number      // B còn nợ A sau bù trừ
+  status: 'pending' | 'confirmed' | 'rejected'
+  description: string | null
+  initiated_by: number
+  confirmed_by: number | null
+  created_at: string
+  updated_at: string
+  // Reference IDs
+  from_debt_id: number
+  to_debt_id: number
+  // Permission flags
+  needs_my_confirmation: boolean
+  is_initiator: boolean
+}
+
 export interface Payment {
   id: number
   debt_id: number
   customer_id: number
   agent_id: number
   amount: string
-  payment_method: 'cash' | 'bank_transfer' | 'other'
+  payment_method: 'cash' | 'bank_transfer' | 'debt_offset' | 'other'
   payment_date: string
   notes: string | null
   status?: 'pending_confirmation' | 'confirmed' | 'rejected'

@@ -115,6 +115,7 @@ Route::middleware(['auth:sanctum', 'agent'])->prefix('agent')->group(function ()
     // Agent debt and payment routes
     Route::get('/debts', [DebtController::class, 'indexForAgent']);
     Route::get('/debts/{id}', [DebtController::class, 'show']);
+    Route::get('/debts/{id}/opposite', [DebtController::class, 'findOppositeDebt']); // Tìm công nợ đối ứng
     Route::put('/debts/{id}', [DebtController::class, 'update']);
     
     // Debt transfer routes

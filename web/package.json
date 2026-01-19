@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:hosting": "BUILD_FOR_HOSTING=true next build",
     "start": "next start",
     "lint": "next lint"
   },

@@ -20,7 +20,7 @@ interface Customer {
 
 export default function AdminCustomersPage() {
   const router = useRouter()
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, logout } = useAuthStore()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<{
@@ -114,6 +114,15 @@ export default function AdminCustomersPage() {
               </Link>
               <span className="text-gray-500">|</span>
               <span className="text-sm text-gray-700">{user.name}</span>
+              <button
+                onClick={() => {
+                  logout()
+                  router.push('/login')
+                }}
+                className="text-gray-700 hover:text-primary-600 text-sm font-medium"
+              >
+                Đăng xuất
+              </button>
             </div>
           </div>
         </div>

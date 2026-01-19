@@ -1,0 +1,5 @@
+# Local development - không commit
+.next/
+node_modules/
+.env.local
+*.log

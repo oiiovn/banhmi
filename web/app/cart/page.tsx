@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useCartStore } from '@/lib/store/cartStore'
 import CustomerHeader from '@/components/CustomerHeader'
+import { getImageUrl } from '@/lib/config'
 
 export default function CartPage() {
   const router = useRouter()
@@ -27,7 +28,7 @@ export default function CartPage() {
 
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
           <p className="text-gray-600">Đang tải...</p>
@@ -75,7 +76,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <CustomerHeader />
 
       <div className="container mx-auto px-4 py-8">
@@ -120,13 +121,17 @@ export default function CartPage() {
                         <div className="flex gap-3">
                           {/* Product Image */}
                           <div className="flex-shrink-0">
-                            {item.product_image ? (
+                            {getImageUrl(item.product_image) ? (
                               <Image
-                                src={item.product_image}
+                                src={getImageUrl(item.product_image)!}
                                 alt={item.product_name}
                                 width={80}
                                 height={80}
                                 className="w-20 h-20 object-cover rounded-lg"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none'
+                                  ;(e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden')
+                                }}
                               />
                             ) : (
                               <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center">

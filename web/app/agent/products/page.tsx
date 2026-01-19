@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/store/authStore'
 import { agentApi, Product, ProductData, Category, CategoryData } from '@/lib/api/agent'
 import AgentHeader from '@/components/AgentHeader'
 import Modal from '@/components/Modal'
+import { getImageUrl } from '@/lib/config'
 
 export default function AgentProductsPage() {
   const router = useRouter()
@@ -140,26 +141,19 @@ export default function AgentProductsPage() {
     setErrorMessage('')
   }
 
-  // Tự động cập nhật mô tả khi quantity_per_unit, unit, hoặc wholesale_price thay đổi
-  useEffect(() => {
-    if (formData.quantity_per_unit && formData.unit && formData.wholesale_price) {
-      const quantity = formData.quantity_per_unit
-      const unit = formData.unit
-      const price = formData.wholesale_price
-      // Format giá với dấu chấm phân cách hàng nghìn
-      const formattedPrice = price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-      const newDescription = `Số lượng ${quantity} ${unit} là giá ${formattedPrice} đ`
-      
-      // Chỉ cập nhật nếu description khác với giá trị hiện tại để tránh vòng lặp vô hạn
-      if (formData.description !== newDescription) {
-        setFormData((prev) => ({
-          ...prev,
-          description: newDescription,
-        }))
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.quantity_per_unit, formData.unit, formData.wholesale_price])
+  // Đã tắt tự động cập nhật mô tả - cho phép người dùng tự nhập mô tả tùy ý
+  // useEffect(() => {
+  //   if (formData.quantity_per_unit && formData.unit && formData.wholesale_price) {
+  //     const quantity = formData.quantity_per_unit
+  //     const unit = formData.unit
+  //     const price = formData.wholesale_price
+  //     const formattedPrice = price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  //     const newDescription = `Số lượng ${quantity} ${unit} là giá ${formattedPrice} đ`
+  //     if (formData.description !== newDescription) {
+  //       setFormData((prev) => ({ ...prev, description: newDescription }))
+  //     }
+  //   }
+  // }, [formData.quantity_per_unit, formData.unit, formData.wholesale_price])
 
   const resetForm = () => {
     setFormData({
@@ -472,7 +466,7 @@ export default function AgentProductsPage() {
 
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
           <p className="text-gray-600">Đang tải...</p>
@@ -486,12 +480,11 @@ export default function AgentProductsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <AgentHeader />
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-3xl font-bold">Quản lý Sản phẩm</h2>
+      <div className="container mx-auto px-4 py-4 pb-20">
+        <div className="flex justify-end items-center mb-4">
           <div className="flex gap-2">
             <button
               onClick={() => {
@@ -499,7 +492,7 @@ export default function AgentProductsPage() {
                 setEditingCategory(null)
                 setShowCategoryForm(true)
               }}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
+              className="bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 text-sm font-medium whitespace-nowrap"
             >
               + Tạo danh mục
             </button>
@@ -508,9 +501,9 @@ export default function AgentProductsPage() {
                 resetForm()
                 setShowCreateForm(true)
               }}
-              className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700"
+              className="bg-primary-600 text-white px-3 py-1.5 rounded-lg hover:bg-primary-700 text-sm font-medium whitespace-nowrap"
             >
-              + Tạo sản phẩm mới
+              + Tạo sản phẩm
             </button>
           </div>
         </div>
@@ -830,144 +823,67 @@ export default function AgentProductsPage() {
 
         {/* Products List */}
         {loading ? (
-          <div className="text-center py-8">Đang tải...</div>
+          <div className="text-center py-8 text-sm text-gray-500">Đang tải...</div>
         ) : products.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <p className="text-gray-500">Chưa có sản phẩm nào</p>
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+            <p className="text-sm text-gray-500">Chưa có sản phẩm nào</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ảnh
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Mã SP
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tên sản phẩm
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Danh mục
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Giá sỉ
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Giá gốc
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Đơn vị
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Trạng thái
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {products.map((product) => (
-                  <tr key={product.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {product.image ? (
-                        <img
-                          src={product.image}
-                          alt={product.name}
-                          className="w-16 h-16 aspect-square object-cover rounded-lg"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 aspect-square bg-gray-200 rounded-lg flex items-center justify-center text-gray-400 text-xs">
-                          No Image
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.sku || '-'}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {product.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.category?.name || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.wholesale_price ? (
-                        <div>
-                          <div>{parseFloat(product.wholesale_price).toLocaleString('vi-VN')} đ</div>
-                          {product.unit && (
-                            <div className="text-xs text-gray-400">
-                              {product.quantity_per_unit && parseFloat(product.quantity_per_unit) > 0
-                                ? `${parseFloat(product.quantity_per_unit)} ${product.unit}`
-                                : product.unit}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.original_price ? (
-                        <div>
-                          <div>{parseFloat(product.original_price).toLocaleString('vi-VN')} đ</div>
-                          {product.unit && (
-                            <div className="text-xs text-gray-400">
-                              {product.quantity_per_unit && parseFloat(product.quantity_per_unit) > 0
-                                ? `${parseFloat(product.quantity_per_unit)} ${product.unit}`
-                                : product.unit}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.unit ? (
-                        <div>
-                          <div>
-                            {product.quantity_per_unit && parseFloat(product.quantity_per_unit) > 0
-                              ? `${parseFloat(product.quantity_per_unit)} ${product.unit}`
-                              : product.unit}
-                          </div>
-                        </div>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full ${
-                          product.is_available
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {product.is_available ? 'Đang bán' : 'Ngừng bán'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => handleEdit(product)}
-                        className="text-primary-600 hover:text-primary-900 mr-4"
-                      >
-                        Sửa
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Xóa
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-2">
+            {products.map((product) => (
+              <div
+                key={product.id}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition flex gap-3"
+              >
+                {/* Image - Small, left side, 1:1 */}
+                <div className="w-20 h-20 flex-shrink-0 bg-gray-100">
+                  {getImageUrl(product.image) ? (
+                    <img
+                      src={getImageUrl(product.image)!}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement
+                        img.style.display = 'none'
+                        const placeholder = img.nextElementSibling as HTMLElement
+                        if (placeholder) placeholder.classList.remove('hidden')
+                      }}
+                    />
+                  ) : null}
+                  <div className={`w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs ${getImageUrl(product.image) ? 'hidden' : ''}`}>
+                    🍞
+                  </div>
+                </div>
+
+                {/* Content - Right side */}
+                <div className="flex-1 flex items-center justify-between gap-3 p-3 min-w-0">
+                  {/* Product Info */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-gray-900 truncate mb-1">{product.name}</h3>
+                    <p className="text-base font-bold text-primary-600">
+                      {product.wholesale_price ? parseFloat(product.wholesale_price).toLocaleString('vi-VN') + ' đ' : '-'}
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleEdit(product)}
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium transition whitespace-nowrap"
+                    >
+                      Sửa
+                    </button>
+                    <button
+                      onClick={() => handleDelete(product.id)}
+                      className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs font-medium transition whitespace-nowrap"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

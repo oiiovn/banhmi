@@ -109,7 +109,7 @@ export default function LoginPage() {
   // Don't render until hydrated to avoid flash
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
           <p className="text-gray-600">Đang tải...</p>
@@ -119,7 +119,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
           <Link href="/" className="flex justify-center">
@@ -197,15 +197,6 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Tài khoản mẫu:
-            </p>
-            <div className="mt-2 text-xs text-gray-500 space-y-1">
-              <p>Admin: admin@banhmi.com / admin123</p>
-              <p>Đại lý: agent1@banhmi.com / agent123</p>
-            </div>
-          </div>
         </form>
       </div>
     </div>

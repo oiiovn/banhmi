@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -9,6 +9,8 @@ import { useOrderNotificationStore, STATUSES_TO_TRACK } from '@/lib/store/orderN
 import api from '@/lib/api'
 import CustomerHeader from '@/components/CustomerHeader'
 import Modal from '@/components/Modal'
+import { Toast, useToast } from '@/components/Toast'
+import { getImageUrl } from '@/lib/config'
 
 interface OrderItem {
   id: number
@@ -117,6 +119,9 @@ export default function OrdersPage() {
 
   // Set default expanded sections based on screen size
   useEffect(() => {
+    // Chỉ chạy trên client-side
+    if (typeof window === 'undefined') return
+
     const checkScreenSize = () => {
       const width = window.innerWidth
       // iPad trở lên (768px+): mở Thông tin giao hàng
@@ -144,6 +149,7 @@ export default function OrdersPage() {
     type: 'alert',
     message: '',
   })
+  const toast = useToast()
 
   // Fetch chi tiết đơn hàng theo ID
   const fetchOrderDetails = useCallback(async (orderId: number) => {
@@ -152,11 +158,13 @@ export default function OrdersPage() {
       if (response.data.success) {
         setSelectedOrder(response.data.data)
         // Set default expanded sections based on screen size
-        const width = window.innerWidth
-        setExpandedSections({
-          delivery: width >= 768, // iPad trở lên
-          auditLogs: false, // Luôn đóng mặc định
-        })
+        if (typeof window !== 'undefined') {
+          const width = window.innerWidth
+          setExpandedSections({
+            delivery: width >= 768, // iPad trở lên
+            auditLogs: false, // Luôn đóng mặc định
+          })
+        }
         // Giữ lại returnTo và debtId trong URL nếu có, chỉ xóa orderId
         const status = searchParams.get('status')
         const returnTo = searchParams.get('returnTo')
@@ -367,7 +375,7 @@ export default function OrdersPage() {
   // Don't render until hydrated to avoid flash
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
           <p className="text-gray-600">Đang tải...</p>
@@ -381,14 +389,11 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Desktop Header */}
-      <div className="hidden md:block">
+    <div className="min-h-screen bg-white">
       <CustomerHeader />
-      </div>
 
-      {/* Mobile Header */}
-      <div className="md:hidden bg-white shadow-sm sticky top-0 z-50 border-b border-gray-200">
+      {/* Mobile Header - Additional info */}
+      <div className="md:hidden bg-white shadow-sm border-b border-gray-200">
         <div className="px-4 py-3 flex justify-between items-center">
           <h1 className="text-lg font-bold text-gray-900">Đơn hàng</h1>
           <label className="flex items-center gap-1.5 cursor-pointer">
@@ -578,7 +583,7 @@ export default function OrdersPage() {
                   // Đánh dấu đơn hàng đã xem chi tiết
                   markOrderAsViewed(order.id)
                 }}
-                className={`rounded-lg shadow-sm hover:shadow-md transition-shadow p-3 cursor-pointer active:bg-gray-50 ${
+                className={`rounded-lg shadow-sm hover:shadow-md transition-shadow p-3 cursor-pointer active:bg-white ${
                   isUnread ? 'bg-blue-50 border-l-4 border-blue-500' : 'bg-white'
                 }`}
               >
@@ -622,36 +627,18 @@ export default function OrdersPage() {
                         <button
                         onClick={async (e) => {
                           e.stopPropagation() // Ngăn mở modal khi click nút
-                          setModal({
-                            isOpen: true,
-                            type: 'confirm',
-                            title: 'Xác nhận đã nhận hàng',
-                            message: 'Bạn có chắc chắn đã nhận được hàng?',
-                            onConfirm: async () => {
-                              try {
-                                const response = await api.post(`/orders/${order.id}/confirm-received`)
-                                if (response.data.success) {
-                                  setModal({
-                                    isOpen: true,
-                                    type: 'alert',
-                                    title: 'Thành công',
-                                    message: 'Đã xác nhận nhận hàng thành công!',
-                                  })
-                                  fetchOrders()
-                                  fetchAllOrdersForStats()
-                                  // Đánh dấu đơn hàng đã xem
-                                  markOrderAsViewed(order.id)
-                                }
-                              } catch (error: any) {
-                                setModal({
-                                  isOpen: true,
-                                  type: 'alert',
-                                  title: 'Lỗi',
-                                  message: 'Không thể xác nhận: ' + (error.response?.data?.message || error.message),
-                                })
-                              }
-                            },
-                          })
+                          try {
+                            const response = await api.post(`/orders/${order.id}/confirm-received`)
+                            if (response.data.success) {
+                              toast.success('Đã xác nhận nhận hàng!')
+                              fetchOrders()
+                              fetchAllOrdersForStats()
+                              // Đánh dấu đơn hàng đã xem
+                              markOrderAsViewed(order.id)
+                            }
+                          } catch (error: any) {
+                            toast.error('Lỗi: ' + (error.response?.data?.message || error.message))
+                          }
                         }}
                         className="px-2.5 py-0.5 bg-green-600 text-white text-[10px] font-medium rounded hover:bg-green-700 transition active:bg-green-800 whitespace-nowrap"
                       >
@@ -672,7 +659,7 @@ export default function OrdersPage() {
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
             <div
-              className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+              className="fixed inset-0 transition-opacity bg-white0 bg-opacity-75"
               onClick={() => {
                 const returnTo = searchParams.get('returnTo')
                 const debtId = searchParams.get('debtId')
@@ -820,13 +807,17 @@ export default function OrdersPage() {
                           index !== selectedOrder.items.length - 1 ? 'border-b border-gray-200' : ''
                         }`}
                       >
-                        {item.product.image ? (
+                        {getImageUrl(item.product.image) ? (
                           <Image
-                            src={item.product.image}
+                            src={getImageUrl(item.product.image)!}
                             alt={item.product.name}
                             width={56}
                             height={56}
                             className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none'
+                              ;(e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden')
+                            }}
                           />
                         ) : (
                           <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -896,7 +887,7 @@ export default function OrdersPage() {
                                 const newFormatted = formatChangeValue(log.new_value, selectedOrder)
                                 if (oldFormatted || newFormatted) {
                                   return (
-                                      <div className="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded-md px-2 py-1.5 border border-gray-200">
+                                      <div className="mt-1.5 text-xs text-gray-600 bg-white rounded-md px-2 py-1.5 border border-gray-200">
                                         <div className="flex items-center gap-1.5 flex-wrap">
                                         {oldFormatted && (
                                           <span className="text-red-600 line-through">
@@ -930,36 +921,18 @@ export default function OrdersPage() {
                 <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
                   {selectedOrder.status === 'delivered_by_agent' && (
                     <button
-                      onClick={() => {
-                        setModal({
-                          isOpen: true,
-                          type: 'confirm',
-                          title: 'Xác nhận',
-                          message: 'Bạn có chắc chắn đã nhận được hàng?',
-                          onConfirm: async () => {
+                      onClick={async () => {
                         try {
                           const response = await api.post(`/orders/${selectedOrder.id}/confirm-received`)
                           if (response.data.success) {
-                                setModal({
-                                  isOpen: true,
-                                  type: 'alert',
-                                  title: 'Thành công',
-                                  message: 'Đã xác nhận nhận hàng thành công!',
-                                })
+                            toast.success('Đã xác nhận nhận hàng!')
                             setSelectedOrder(response.data.data)
                             fetchOrders()
-                                fetchAllOrdersForStats()
+                            fetchAllOrdersForStats()
                           }
                         } catch (error: any) {
-                              setModal({
-                                isOpen: true,
-                                type: 'alert',
-                                title: 'Lỗi',
-                                message: 'Không thể xác nhận: ' + (error.response?.data?.message || error.message),
-                              })
-                            }
-                          },
-                        })
+                          toast.error('Lỗi: ' + (error.response?.data?.message || error.message))
+                        }
                       }}
                       className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition"
                     >
@@ -998,6 +971,9 @@ export default function OrdersPage() {
         confirmText={modal.confirmText}
         cancelText={modal.cancelText}
       />
+
+      {/* Toast notifications */}
+      <Toast toasts={toast.toasts} onRemove={toast.removeToast} />
     </div>
   )
 }

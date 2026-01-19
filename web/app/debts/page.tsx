@@ -30,6 +30,13 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Đã hủy',
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: 'Tiền mặt',
+  bank_transfer: 'Chuyển khoản',
+  debt_offset: 'Bù trừ công nợ',
+  other: 'Khác',
+}
+
 // Format order ID as BM-XXX
 const formatOrderId = (id: number) => {
   return `BM-${id.toString().padStart(3, '0')}`
@@ -327,7 +334,7 @@ export default function CustomerDebtsPage() {
 
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
           <p className="text-gray-600">Đang tải...</p>
@@ -345,14 +352,11 @@ export default function CustomerDebtsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Desktop Header */}
-      <div className="hidden md:block">
-        <CustomerHeader />
-      </div>
+    <div className="min-h-screen bg-white">
+      <CustomerHeader />
 
-      {/* Mobile Header */}
-      <div className="md:hidden bg-white shadow-sm sticky top-0 z-50 border-b border-gray-200">
+      {/* Mobile Header - Additional info */}
+      <div className="md:hidden bg-white shadow-sm border-b border-gray-200">
         <div className="px-4 py-3">
           <h1 className="text-lg font-bold text-gray-900">Công nợ</h1>
         </div>
@@ -471,7 +475,7 @@ export default function CustomerDebtsPage() {
                       setSelectedDebt(debt)
                     }
                   }}
-                  className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-3 cursor-pointer active:bg-gray-50"
+                  className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-3 cursor-pointer active:bg-white"
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex-1">
@@ -526,7 +530,7 @@ export default function CustomerDebtsPage() {
             {/* Desktop: Table Layout */}
             <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-white">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Công nợ
@@ -553,7 +557,7 @@ export default function CustomerDebtsPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {debts.map((debt) => (
-                    <tr key={debt.id} className="hover:bg-gray-50">
+                    <tr key={debt.id} className="hover:bg-white">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {debt.agent?.name || 'Chưa có đại lý'}
                       </td>
@@ -631,14 +635,14 @@ export default function CustomerDebtsPage() {
             ></div>
 
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-              <div className="bg-white px-4 pt-3 pb-3 sm:p-4 sm:pb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-lg font-bold text-gray-900">Chi tiết công nợ #{selectedDebt.id}</h3>
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-2xl font-bold text-gray-900">Chi tiết công nợ #{selectedDebt.id}</h3>
                   <button
                     onClick={() => setSelectedDebt(null)}
                     className="text-gray-400 hover:text-gray-600"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -649,38 +653,37 @@ export default function CustomerDebtsPage() {
                   </button>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-4">
                   {/* Debt Info */}
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="space-y-1 text-xs">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">Đại lý:</span>
-                        <span>{selectedDebt.agent?.name || '-'}</span>
+                  <div className="bg-white rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3">Thông tin công nợ</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium">Đại lý:</span> {selectedDebt.agent?.name || '-'}
                       </div>
                       {selectedDebt.debtOrders && selectedDebt.debtOrders.length > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">Số đơn hàng:</span>
-                          <span>{selectedDebt.debtOrders.length} đơn</span>
+                        <div className="col-span-2">
+                          <span className="font-medium">Số đơn hàng:</span> {selectedDebt.debtOrders.length} đơn
                         </div>
                       )}
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">Tổng tiền:</span>
+                      <div>
+                        <span className="font-medium">Tổng tiền:</span>{' '}
                         <span className="font-bold">{formatCurrency(selectedDebt.total_amount)} đ</span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">Đã thanh toán:</span>
+                      <div>
+                        <span className="font-medium">Đã thanh toán:</span>{' '}
                         <span className="text-green-600 font-bold">
                           {formatCurrency(selectedDebt.paid_amount)} đ
                         </span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">Còn lại:</span>
+                      <div>
+                        <span className="font-medium">Còn lại:</span>{' '}
                         <span className="text-red-600 font-bold">
                           {formatCurrency(selectedDebt.remaining_amount)} đ
                         </span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">Trạng thái:</span>
+                      <div>
+                        <span className="font-medium">Trạng thái:</span>{' '}
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-bold ${
                             STATUS_COLORS[selectedDebt.status] || 'bg-gray-100 text-gray-800'
@@ -695,14 +698,14 @@ export default function CustomerDebtsPage() {
                   {/* Orders List (for consolidated debt or single order debt) */}
                   {((selectedDebt.debtOrders && selectedDebt.debtOrders.length > 0) || selectedDebt.order_id) && (
                     <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                      <h4 className="font-semibold text-gray-900 mb-3">
                         {selectedDebt.debtOrders && selectedDebt.debtOrders.length > 0
                           ? 'Lịch sử gộp công nợ'
                           : 'Thông tin đơn hàng'}
                       </h4>
                       {selectedDebt.debtOrders && selectedDebt.debtOrders.length > 0 && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-2">
-                          <p className="text-xs text-blue-800">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                          <p className="text-sm text-blue-800">
                             <span className="font-semibold">💡 Lưu ý:</span> Các đơn hàng này đã được tự động gộp vào công nợ tổng khi khách hàng xác nhận nhận hàng.
                           </p>
                         </div>
@@ -710,40 +713,86 @@ export default function CustomerDebtsPage() {
                       <div className="bg-white border rounded-lg overflow-hidden">
                         <div className="max-h-[200px] overflow-y-auto">
                           <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50 sticky top-0">
+                            <thead className="bg-gray-50 sticky top-0 z-10">
                               <tr>
-                                <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">
-                                  Mã đơn
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                  Mã đơn hàng
                                 </th>
-                              <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">
-                                Ngày gộp
-                              </th>
-                              <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">
-                                Số tiền
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {selectedDebt.debtOrders && selectedDebt.debtOrders.length > 0 ? (
-                              // Consolidated debt - multiple orders - sắp xếp theo thời gian gộp vào công nợ (mới nhất lên đầu)
-                              [...selectedDebt.debtOrders]
-                                .sort((a, b) => {
-                                  const dateA = (a as any).created_at ? new Date((a as any).created_at).getTime() : 0
-                                  const dateB = (b as any).created_at ? new Date((b as any).created_at).getTime() : 0
-                                  return dateB - dateA // Giảm dần (mới nhất lên đầu)
-                                })
-                                .map((debtOrder) => (
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                  Ngày đặt hàng
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                  Ngày gộp vào công nợ
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                  Số tiền
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {selectedDebt.debtOrders && selectedDebt.debtOrders.length > 0 ? (
+                                // Consolidated debt - multiple orders - sắp xếp theo thời gian gộp vào công nợ (mới nhất lên đầu)
+                                [...selectedDebt.debtOrders]
+                                  .sort((a, b) => {
+                                    const dateA = (a as any).created_at ? new Date((a as any).created_at).getTime() : 0
+                                    const dateB = (b as any).created_at ? new Date((b as any).created_at).getTime() : 0
+                                    return dateB - dateA // Giảm dần (mới nhất lên đầu)
+                                  })
+                                  .map((debtOrder: any) => (
+                                  <tr 
+                                    key={debtOrder.id} 
+                                    className="hover:bg-gray-50 cursor-pointer"
+                                    onClick={() => handleViewOrder(debtOrder.order_id, selectedDebt?.id)}
+                                  >
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                      {formatOrderId(debtOrder.order_id)}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                      {debtOrder.order?.created_at
+                                        ? new Date(debtOrder.order.created_at).toLocaleDateString('vi-VN', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric',
+                                          })
+                                        : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                      {debtOrder.created_at
+                                        ? new Date(debtOrder.created_at).toLocaleDateString('vi-VN', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                          })
+                                        : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                      {formatCurrency(debtOrder.amount)} đ
+                                    </td>
+                                  </tr>
+                                ))
+                              ) : selectedDebt.order_id ? (
+                                // Single order debt (old data)
                                 <tr 
-                                  key={debtOrder.id} 
                                   className="hover:bg-gray-50 cursor-pointer"
-                                  onClick={() => handleViewOrder(debtOrder.order_id, selectedDebt?.id)}
+                                  onClick={() => selectedDebt.order_id && handleViewOrder(selectedDebt.order_id, selectedDebt.id)}
                                 >
-                                  <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
-                                    {formatOrderId(debtOrder.order_id)}
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    {formatOrderId(selectedDebt.order_id)}
                                   </td>
-                                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-600">
-                                    {(debtOrder as any).created_at
-                                      ? new Date((debtOrder as any).created_at).toLocaleDateString('vi-VN', {
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {selectedDebt.created_at
+                                      ? new Date(selectedDebt.created_at).toLocaleDateString('vi-VN', {
+                                          day: '2-digit',
+                                          month: '2-digit',
+                                          year: 'numeric',
+                                        })
+                                      : '-'}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                    {selectedDebt.created_at
+                                      ? new Date(selectedDebt.created_at).toLocaleDateString('vi-VN', {
                                           day: '2-digit',
                                           month: '2-digit',
                                           year: 'numeric',
@@ -752,36 +801,11 @@ export default function CustomerDebtsPage() {
                                         })
                                       : '-'}
                                   </td>
-                                  <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
-                                    {formatCurrency(debtOrder.amount)} đ
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    {formatCurrency(selectedDebt.total_amount)} đ
                                   </td>
                                 </tr>
-                              ))
-                            ) : selectedDebt.order_id ? (
-                              // Single order debt (old data)
-                              <tr 
-                                className="hover:bg-gray-50 cursor-pointer"
-                                onClick={() => selectedDebt.order_id && handleViewOrder(selectedDebt.order_id, selectedDebt.id)}
-                              >
-                                <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
-                                  {formatOrderId(selectedDebt.order_id)}
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-600">
-                                  {selectedDebt.created_at
-                                    ? new Date(selectedDebt.created_at).toLocaleDateString('vi-VN', {
-                                        day: '2-digit',
-                                        month: '2-digit',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      })
-                                    : '-'}
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
-                                  {formatCurrency(selectedDebt.total_amount)} đ
-                                </td>
-                              </tr>
-                            ) : null}
+                              ) : null}
                             </tbody>
                           </table>
                         </div>
@@ -792,101 +816,87 @@ export default function CustomerDebtsPage() {
                   {/* Payment History */}
                   {selectedDebt.payments && selectedDebt.payments.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-2">Lịch sử thanh toán</h4>
+                      <h4 className="font-semibold text-gray-900 mb-3">Lịch sử thanh toán</h4>
                       <div className="bg-white border rounded-lg overflow-hidden">
                         <div className="max-h-[200px] overflow-y-auto">
                           <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50 sticky top-0">
+                            <thead className="bg-gray-50 sticky top-0 z-10">
                               <tr>
-                                <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">
-                                  Ngày
-                                </th>
-                              <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">
-                                Số tiền
-                              </th>
-                              <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">
-                                Trạng thái
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {[...selectedDebt.payments]
-                              .sort((a, b) => {
-                                // Sắp xếp theo created_at (thời gian tạo) để thanh toán mới nhất lên đầu
-                                const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
-                                const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
-                                return dateB - dateA // Giảm dần (mới nhất lên đầu)
-                              })
-                              .map((payment: any) => {
-                                const getStatusInfo = (status?: string) => {
-                                  if (!status || status === 'confirmed') {
-                                    return {
-                                      label: 'Đã xác nhận',
-                                      color: 'bg-green-100 text-green-800',
-                                      by: payment.confirmedBy ? ` bởi ${payment.confirmedBy.name}` : '',
-                                    }
-                                  }
-                                  if (status === 'pending_confirmation') {
-                                    return {
-                                      label: 'Chờ xác nhận',
-                                      color: 'bg-yellow-100 text-yellow-800',
-                                      by: '',
-                                    }
-                                  }
-                                  if (status === 'rejected') {
-                                    return {
-                                      label: 'Từ chối',
-                                      color: 'bg-red-100 text-red-800',
-                                      by: payment.confirmedBy ? ` bởi ${payment.confirmedBy.name}` : '',
-                                    }
-                                  }
-                                  return {
-                                    label: 'Đã xác nhận',
-                                    color: 'bg-green-100 text-green-800',
-                                    by: payment.confirmedBy ? ` bởi ${payment.confirmedBy.name}` : '',
-                                  }
-                                }
-                                const statusInfo = getStatusInfo(payment.status)
-                                const isHighlighted = highlightedPaymentId === payment.id
-                                return (
-                              <tr 
-                                key={payment.id}
-                                ref={isHighlighted ? paymentRowRef : null}
-                                className={`hover:bg-gray-50 cursor-pointer transition-all ${
-                                  isHighlighted 
-                                    ? 'bg-yellow-100 border-l-4 border-yellow-500 shadow-md' 
-                                    : ''
-                                }`}
-                                onClick={() => router.push(`/payments?id=${payment.id}`)}
-                              >
-                                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                                  {payment.created_at
-                                    ? new Date(payment.created_at).toLocaleDateString('vi-VN', {
-                                        day: '2-digit',
-                                        month: '2-digit',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      })
-                                    : formatDate(payment.payment_date)}
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-green-600">
-                                  {formatCurrency(payment.amount)} đ
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap">
-                                  <div className="flex flex-col gap-0.5">
-                                    <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${statusInfo.color}`}>
-                                      {statusInfo.label}
-                                    </span>
-                                    {statusInfo.by && (
-                                      <span className="text-[10px] text-gray-500">
-                                        {statusInfo.by}
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số tiền</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phương thức</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ghi chú</th>
                               </tr>
-                            )})}
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {[...selectedDebt.payments]
+                                .sort((a, b) => {
+                                  const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+                                  const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+                                  return dateB - dateA
+                                })
+                                .map((payment: any) => {
+                                  const getStatusInfo = (status?: string) => {
+                                    const byText = payment.confirmedBy ? ' bởi ' + payment.confirmedBy.name : ''
+                                    if (!status || status === 'confirmed') {
+                                      return { label: 'Đã xác nhận', color: 'bg-green-100 text-green-800', by: byText }
+                                    }
+                                    if (status === 'pending_confirmation') {
+                                      return { label: 'Chờ xác nhận', color: 'bg-yellow-100 text-yellow-800', by: '' }
+                                    }
+                                    if (status === 'rejected') {
+                                      return { label: 'Từ chối', color: 'bg-red-100 text-red-800', by: byText }
+                                    }
+                                    return { label: 'Đã xác nhận', color: 'bg-green-100 text-green-800', by: byText }
+                                  }
+                                  const statusInfo = getStatusInfo(payment.status)
+                                  const isHighlighted = highlightedPaymentId === payment.id
+                                  const isDebtOffset = payment.payment_method === 'debt_offset'
+                                  return (
+                                    <tr 
+                                      key={payment.id}
+                                      ref={isHighlighted ? paymentRowRef : null}
+                                      className={`hover:bg-gray-50 cursor-pointer transition-all ${
+                                        isHighlighted 
+                                          ? 'bg-yellow-100 border-l-4 border-yellow-500 shadow-md' 
+                                          : isDebtOffset
+                                          ? 'bg-purple-50'
+                                          : ''
+                                      }`}
+                                      onClick={() => router.push(`/payments?id=${payment.id}`)}
+                                    >
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {formatDate(payment.payment_date)}
+                                      </td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                                        <div className="flex flex-col">
+                                          <span className={isDebtOffset ? 'text-purple-600' : 'text-green-600'}>
+                                            {isDebtOffset ? 'Đã bù trừ: ' : ''}{formatCurrency(payment.amount)} đ
+                                          </span>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                        <span className={isDebtOffset ? 'text-purple-700 font-medium' : 'text-gray-900'}>
+                                          {PAYMENT_METHOD_LABELS[payment.payment_method] || 'Khác'}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3 whitespace-nowrap">
+                                        <div className="flex flex-col gap-1">
+                                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusInfo.color}`}>
+                                            {statusInfo.label}
+                                          </span>
+                                          {statusInfo.by && (
+                                            <span className="text-xs text-gray-500">{statusInfo.by}</span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-gray-900 max-w-[200px] truncate" title={payment.notes || ''}>
+                                        {payment.notes || '-'}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
                             </tbody>
                           </table>
                         </div>
@@ -1067,7 +1077,7 @@ export default function CustomerDebtsPage() {
                         setShowPaymentModal(false)
                         setSelectedDebt(null)
                       }}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white transition"
                     >
                       Hủy
                     </button>

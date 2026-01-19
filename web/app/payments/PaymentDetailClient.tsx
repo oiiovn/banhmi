@@ -23,6 +23,7 @@ const STATUS_LABELS: Record<string, string> = {
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: 'Tiền mặt',
   bank_transfer: 'Chuyển khoản',
+  debt_offset: 'Bù trừ công nợ',
   other: 'Khác',
 }
 
@@ -133,7 +134,7 @@ export default function PaymentDetailClient() {
 
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
           <p className="text-gray-600">Đang tải...</p>
@@ -144,7 +145,7 @@ export default function PaymentDetailClient() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-white">
         <CustomerHeader />
         <div className="container mx-auto px-4 py-8">
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
@@ -158,7 +159,7 @@ export default function PaymentDetailClient() {
 
   if (!payment) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-white">
         <CustomerHeader />
         <div className="container mx-auto px-4 py-8">
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
@@ -176,7 +177,7 @@ export default function PaymentDetailClient() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <CustomerHeader />
 
       <div className="container mx-auto px-4 py-6 md:py-8">

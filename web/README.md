@@ -17,9 +17,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api
 npm run dev
 # hoặc
 yarn dev
-```
-
-Ứng dụng sẽ chạy tại `http://localhost:3000`
+```Ứng dụng sẽ chạy tại `http://localhost:3000`
 
 ## Cấu trúc dự án
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store/authStore'
 import { authApi } from '@/lib/api/auth'
@@ -17,6 +17,8 @@ export default function AgentDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [selectedStatus, setSelectedStatus] = useState<string>('')
   const [isHydrated, setIsHydrated] = useState(false)
+  const loadingRef = useRef(false)
+  const mountedRef = useRef(true)
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
   const [modal, setModal] = useState<{
@@ -53,22 +55,66 @@ export default function AgentDashboardPage() {
   }, [isHydrated, isAuthenticated, user, router, viewMode, setViewMode])
 
   useEffect(() => {
-    if (!isHydrated || !isAuthenticated || !user || user.role !== 'agent') return
+    mountedRef.current = true
+    
+    if (!isHydrated || !isAuthenticated || !user || user.role !== 'agent') {
+      // Nếu không đủ điều kiện, set loading false ngay
+      setLoading(false)
+      loadingRef.current = false
+      return
+    }
     
     // Refresh user data to ensure role is up to date (only once on mount)
     authApi.getCurrentUser().catch(console.error)
     
-    // Initial fetch
-    fetchData()
+    let timeoutId: NodeJS.Timeout | null = null
+    
+    // Initial fetch với timeout để tránh kẹt
+    const loadData = async () => {
+      if (!mountedRef.current) return
+      
+      loadingRef.current = true
+      setLoading(true)
+      
+      try {
+        await fetchData()
+      } catch (error) {
+        console.error('Error in loadData:', error)
+      } finally {
+        // Đảm bảo loading luôn được reset
+        if (mountedRef.current) {
+          loadingRef.current = false
+          setLoading(false)
+        }
+      }
+    }
+    
+    // Thêm timeout để tránh kẹt vô hạn
+    timeoutId = setTimeout(() => {
+      if (mountedRef.current && loadingRef.current) {
+        console.warn('⚠️ Loading timeout - forcing loading to false')
+        loadingRef.current = false
+        setLoading(false)
+      }
+    }, 10000) // 10 giây timeout
+    
+    loadData()
+    
+    return () => {
+      mountedRef.current = false
+      loadingRef.current = false
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
   }, [isHydrated, isAuthenticated, user?.id])
 
   useEffect(() => {
     if (!isHydrated || !isAuthenticated || !user || user.role !== 'agent') return
     
-    // Fetch orders when status filter changes
+    // Fetch orders when status filter changes (không set loading để tránh conflict)
     const fetchOrders = async () => {
       try {
-        setLoading(true)
         const ordersRes = await agentApi.getOrders(selectedStatus || undefined)
         if (ordersRes.success && ordersRes.data) {
           // Chỉ hiển thị các đơn hàng chưa delivered (cần xử lý)
@@ -79,8 +125,6 @@ export default function AgentDashboardPage() {
         }
       } catch (error) {
         console.error('Error fetching orders:', error)
-      } finally {
-        setLoading(false)
       }
     }
     
@@ -88,33 +132,61 @@ export default function AgentDashboardPage() {
   }, [selectedStatus, isHydrated, isAuthenticated, user?.id])
 
   const fetchData = async () => {
+    if (!mountedRef.current) return
+    
     try {
-      setLoading(true)
+      // Fetch tất cả API calls với timeout riêng cho mỗi call
+      const dashboardPromise = agentApi.getDashboard().catch((err) => {
+        console.error('❌ Error fetching dashboard:', err)
+        return { success: false, data: null }
+      })
+      
+      const ordersPromise = agentApi.getOrders(selectedStatus || undefined).catch((err) => {
+        console.error('❌ Error fetching orders:', err)
+        return { success: false, data: null }
+      })
+      
+      const pendingPromise = agentApi.getPendingOrders().catch((err) => {
+        console.error('❌ Error fetching pending orders:', err)
+        return { success: false, data: null }
+      })
+      
+      // Chờ tất cả hoàn thành (không dùng Promise.race để tránh timeout sớm)
       const [dashboardRes, ordersRes, pendingRes] = await Promise.all([
-        agentApi.getDashboard(),
-        agentApi.getOrders(selectedStatus || undefined),
-        agentApi.getPendingOrders(),
+        dashboardPromise,
+        ordersPromise,
+        pendingPromise,
       ])
 
+      if (!mountedRef.current) return
+
       // Update states only if data is available
-      if (dashboardRes.success && dashboardRes.data) {
+      if (dashboardRes && dashboardRes.success && dashboardRes.data) {
         setStats(dashboardRes.data)
+      } else {
+        console.warn('⚠️ Dashboard data not available or failed')
       }
-      if (ordersRes.success && ordersRes.data) {
+      
+      if (ordersRes && ordersRes.success && ordersRes.data) {
         // Chỉ hiển thị các đơn hàng chưa delivered (cần xử lý)
         const filteredOrders = ordersRes.data.filter(
           (order: Order) => order.status !== 'delivered' && order.status !== 'cancelled'
         )
         setOrders(filteredOrders)
+      } else {
+        console.warn('⚠️ Orders data not available or failed')
       }
-      if (pendingRes.success && pendingRes.data) {
+      
+      if (pendingRes && pendingRes.success && pendingRes.data) {
         setPendingOrders(pendingRes.data)
+      } else {
+        console.warn('⚠️ Pending orders data not available or failed')
       }
-    } catch (error) {
-      console.error('Error fetching data:', error)
-    } finally {
-      setLoading(false)
+    } catch (error: any) {
+      console.error('❌ Error in fetchData:', error)
+      // Vẫn cho phép trang hiển thị với dữ liệu rỗng
     }
+    // KHÔNG set loading false ở đây - để useEffect finally block xử lý
   }
 
   const handleAcceptOrder = async (orderId: number) => {
@@ -321,7 +393,7 @@ export default function AgentDashboardPage() {
   // Don't render until hydrated to avoid flash
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
           <p className="text-gray-600">Đang tải...</p>
@@ -330,48 +402,135 @@ export default function AgentDashboardPage() {
     )
   }
 
+  // Hiển thị loading khi đang kiểm tra authentication thay vì return null
   if (!isAuthenticated || !user || user.role !== 'agent') {
-    return null
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
+          <p className="text-gray-600">Đang kiểm tra quyền truy cập...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <AgentHeader />
 
-      <div className="container mx-auto px-4 py-8">
-        <h2 className="text-3xl font-bold mb-6">Dashboard Đại lý</h2>
+      <div className="container mx-auto px-4 py-4 pb-20">
+        <h2 className="text-xl font-bold mb-4">Dashboard Đại lý</h2>
+
+        {/* Orders List - Hiển thị đầu tiên, chỉ khi có đơn */}
+        {orders.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-4">
+            <div className="px-4 py-2 border-b">
+              <h3 className="text-sm font-bold">Đơn hàng cần xử lý</h3>
+            </div>
+            <div className="divide-y">
+              {orders.map((order) => (
+                <div key={order.id} className="p-3 hover:bg-gray-50 transition">
+                  <div className="flex justify-between items-start gap-3 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h4 className="text-sm font-bold">Đơn #{order.id}</h4>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                            order.status
+                          )}`}
+                        >
+                          {getStatusLabel(order.status, order)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600">
+                        <span className="font-medium">{order.user.name}</span> - {order.user.phone || order.user.email}
+                      </p>
+                      <p className="text-xs text-gray-600 truncate">{order.delivery_address}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(order.created_at).toLocaleString('vi-VN', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-base font-bold text-primary-600 mb-1">
+                        {parseFloat(order.total_amount).toLocaleString('vi-VN')} đ
+                      </p>
+                      {order.status === 'confirmed' && (
+                        <button
+                          onClick={() => handleUpdateStatus(order.id, 'preparing')}
+                          className="bg-purple-600 text-white px-2 py-1 rounded-lg hover:bg-purple-700 text-xs font-medium"
+                        >
+                          Bắt đầu giao
+                        </button>
+                      )}
+                      {(order.status === 'preparing' || order.status === 'ready') && (
+                        <button
+                          onClick={() => handleUpdateStatus(order.id, 'delivered_by_agent')}
+                          className="bg-green-600 text-white px-2 py-1 rounded-lg hover:bg-green-700 text-xs font-medium"
+                        >
+                          Xác nhận đã giao
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="border-t pt-2 mt-2">
+                    <div className="space-y-0.5">
+                      {order.items.map((item) => (
+                        <div key={item.id} className="flex justify-between text-xs">
+                          <span className="truncate flex-1 mr-2">
+                            {formatQuantityWithUnit(item)}
+                          </span>
+                          <span className="font-medium flex-shrink-0">
+                            {formatPrice(calculateItemTotal(item))}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {order.notes && (
+                      <div className="mt-2 pt-2 border-t">
+                        <p className="text-xs">
+                          <span className="font-semibold">Ghi chú:</span> {order.notes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Statistics */}
-        {loading && !stats ? (
-          <div className="text-center py-8">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-2"></div>
-            <p className="text-gray-600">Đang tải...</p>
+        {loading && !stats && orders.length === 0 ? (
+          <div className="text-center py-6">
+            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mb-2"></div>
+            <p className="text-sm text-gray-600">Đang tải...</p>
           </div>
         ) : stats ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Tổng đơn hàng</h3>
-              <p className="text-3xl font-bold text-primary-600">{stats.total_orders}</p>
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <div className="bg-white rounded-lg shadow-sm p-3">
+              <h3 className="text-xs font-medium text-gray-500 mb-1">Tổng đơn hàng</h3>
+              <p className="text-xl font-bold text-primary-600">{stats.total_orders}</p>
             </div>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Chờ xử lý</h3>
-              <p className="text-3xl font-bold text-yellow-600">{stats.pending_orders}</p>
-            </div>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Đang xử lý</h3>
-              <p className="text-3xl font-bold text-blue-600">
+            <div className="bg-white rounded-lg shadow-sm p-3">
+              <h3 className="text-xs font-medium text-gray-500 mb-1">Đang xử lý</h3>
+              <p className="text-xl font-bold text-blue-600">
                 {stats.confirmed_orders + stats.preparing_orders + stats.ready_orders}
               </p>
             </div>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Doanh thu</h3>
-              <p className="text-3xl font-bold text-green-600">
+            <div className="bg-white rounded-lg shadow-sm p-3">
+              <h3 className="text-xs font-medium text-gray-500 mb-1">Doanh thu</h3>
+              <p className="text-lg font-bold text-green-600">
                 {parseFloat(stats.total_revenue.toString()).toLocaleString('vi-VN')} đ
               </p>
             </div>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Lợi nhuận</h3>
-              <p className="text-3xl font-bold text-purple-600">
+            <div className="bg-white rounded-lg shadow-sm p-3">
+              <h3 className="text-xs font-medium text-gray-500 mb-1">Lợi nhuận</h3>
+              <p className="text-lg font-bold text-purple-600">
                 {parseFloat((stats.total_profit || 0).toString()).toLocaleString('vi-VN')} đ
               </p>
             </div>
@@ -380,27 +539,27 @@ export default function AgentDashboardPage() {
 
         {/* Pending Orders Section */}
         {pendingOrders.length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
-            <h3 className="text-xl font-bold mb-4 text-yellow-800">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+            <h3 className="text-sm font-bold mb-2 text-yellow-800">
               Đơn hàng chưa được nhận ({pendingOrders.length})
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-2">
               {pendingOrders.slice(0, 3).map((order) => (
-                <div key={order.id} className="bg-white rounded-lg p-4 shadow">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-semibold">Đơn hàng #{order.id}</p>
-                      <p className="text-sm text-gray-600">
+                <div key={order.id} className="bg-white rounded-lg p-3 shadow-sm">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm">Đơn #{order.id}</p>
+                      <p className="text-xs text-gray-600 truncate">
                         {order.user.name} - {order.user.phone || order.user.email}
                       </p>
-                      <p className="text-sm text-gray-600">{order.delivery_address}</p>
-                      <p className="text-primary-600 font-bold mt-1">
+                      <p className="text-xs text-gray-600 truncate">{order.delivery_address}</p>
+                      <p className="text-primary-600 font-bold text-sm mt-1">
                         {parseFloat(order.total_amount).toLocaleString('vi-VN')} đ
                       </p>
                     </div>
                     <button
                       onClick={() => handleAcceptOrder(order.id)}
-                      className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
+                      className="bg-primary-600 text-white px-3 py-1.5 rounded-lg hover:bg-primary-700 text-xs font-medium whitespace-nowrap"
                     >
                       Nhận đơn
                     </button>
@@ -410,97 +569,6 @@ export default function AgentDashboardPage() {
             </div>
           </div>
         )}
-
-        {/* Orders List */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="px-6 py-4 border-b">
-            <h3 className="text-xl font-bold">Đơn hàng cần xử lý</h3>
-          </div>
-          {loading ? (
-            <div className="text-center py-8">Đang tải...</div>
-          ) : orders.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500">Chưa có đơn hàng nào</p>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {orders.map((order) => (
-                <div key={order.id} className="p-6 hover:bg-gray-50 transition">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <h4 className="text-lg font-bold">Đơn hàng #{order.id}</h4>
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                            order.status
-                          )}`}
-                        >
-                          {getStatusLabel(order.status, order)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        Khách hàng: <span className="font-medium">{order.user.name}</span>
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        SĐT: {order.user.phone || order.user.email}
-                      </p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Địa chỉ: {order.delivery_address}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-2">
-                        <span className="font-medium">Ngày đặt hàng:</span>{' '}
-                        {new Date(order.created_at).toLocaleString('vi-VN')}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-primary-600 mb-2">
-                        {parseFloat(order.total_amount).toLocaleString('vi-VN')} đ
-                      </p>
-                      {order.status === 'confirmed' && (
-                        <button
-                          onClick={() => handleUpdateStatus(order.id, 'preparing')}
-                          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm"
-                        >
-                          Bắt đầu giao
-                        </button>
-                      )}
-                      {(order.status === 'preparing' || order.status === 'ready') && (
-                        <button
-                          onClick={() => handleUpdateStatus(order.id, 'delivered_by_agent')}
-                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
-                        >
-                          Xác nhận đã giao
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="border-t pt-4">
-                    <h5 className="font-semibold mb-2">Sản phẩm:</h5>
-                    <div className="space-y-1">
-                      {order.items.map((item) => (
-                        <div key={item.id} className="flex justify-between text-sm">
-                          <span>
-                            {formatQuantityWithUnit(item)}
-                          </span>
-                          <span className="font-medium">
-                            {formatPrice(calculateItemTotal(item))}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    {order.notes && (
-                      <div className="mt-3 pt-3 border-t">
-                        <p className="text-sm">
-                          <span className="font-semibold">Ghi chú:</span> {order.notes}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Edit Order Modal */}
