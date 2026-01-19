@@ -38,10 +38,11 @@ class AgentController extends Controller
     {
         $agentId = $request->user()->id;
 
-        // Get all delivered orders for profit calculation
+        // Tối ưu: Chỉ tính profit cho delivered orders (giới hạn 1000 orders để tránh quá chậm)
         $deliveredOrders = Order::where('agent_id', $agentId)
             ->where('status', 'delivered')
-            ->with('items.product')
+            ->with(['items:id,order_id,product_id,price,quantity', 'items.product:id,name,price,wholesale_price'])
+            ->limit(1000)
             ->get();
 
         // Calculate total profit from delivered orders
@@ -50,22 +51,18 @@ class AgentController extends Controller
             $totalProfit += $order->calculateProfit();
         }
 
+        // Tối ưu: Tính statistics trực tiếp từ database (nhanh hơn nhiều)
+        $baseQuery = Order::where('agent_id', $agentId);
+        
         $stats = [
-            'total_orders' => Order::where('agent_id', $agentId)->count(),
-            'pending_orders' => Order::where('agent_id', $agentId)
-                ->where('status', 'pending')->count(),
-            'confirmed_orders' => Order::where('agent_id', $agentId)
-                ->where('status', 'confirmed')->count(),
-            'preparing_orders' => Order::where('agent_id', $agentId)
-                ->whereIn('status', ['preparing', 'ready'])->count(), // Gộp "ready" vào "preparing"
-            'ready_orders' => 0, // Giữ để tương thích với frontend, nhưng luôn = 0
-            'delivered_by_agent_orders' => Order::where('agent_id', $agentId)
-                ->where('status', 'delivered_by_agent')->count(),
-            'delivered_orders' => Order::where('agent_id', $agentId)
-                ->where('status', 'delivered')->count(),
-            'total_revenue' => Order::where('agent_id', $agentId)
-                ->where('status', 'delivered')
-                ->sum('total_amount'),
+            'total_orders' => $baseQuery->count(),
+            'pending_orders' => (clone $baseQuery)->where('status', 'pending')->count(),
+            'confirmed_orders' => (clone $baseQuery)->where('status', 'confirmed')->count(),
+            'preparing_orders' => (clone $baseQuery)->whereIn('status', ['preparing', 'ready'])->count(),
+            'ready_orders' => 0, // Giữ để tương thích với frontend
+            'delivered_by_agent_orders' => (clone $baseQuery)->where('status', 'delivered_by_agent')->count(),
+            'delivered_orders' => (clone $baseQuery)->where('status', 'delivered')->count(),
+            'total_revenue' => (clone $baseQuery)->where('status', 'delivered')->sum('total_amount'),
             'total_profit' => round($totalProfit, 2),
         ];
 
@@ -89,9 +86,10 @@ class AgentController extends Controller
             $query->where('status', $request->status);
         }
 
-        $orders = $query->orderBy('created_at', 'desc')->get();
+        // Giới hạn số lượng orders để tăng tốc độ (có thể thêm pagination sau)
+        $orders = $query->orderBy('created_at', 'desc')->limit(200)->get();
 
-        // Calculate profit for each order
+        // Calculate profit for each order (chỉ tính cho orders hiển thị)
         $ordersWithProfit = $orders->map(function ($order) {
             $order->profit = $order->calculateProfit();
             return $order;
@@ -239,6 +237,7 @@ class AgentController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.price' => 'nullable|numeric|min:0', // Cho phép sửa giá
             'discount' => 'nullable|numeric|min:0',
         ]);
 
@@ -259,7 +258,10 @@ class AgentController extends Controller
             $totalAmount = 0;
             foreach ($request->items as $itemData) {
                 $product = Product::findOrFail($itemData['product_id']);
-                $price = $product->wholesale_price ?? $product->price;
+                // Cho phép sửa giá từ request, nếu không có thì dùng giá mặc định từ product
+                $price = isset($itemData['price']) && $itemData['price'] > 0 
+                    ? (float)$itemData['price'] 
+                    : ($product->wholesale_price ?? $product->price);
                 
                 // Giá là giá cho 1 quantity_per_unit (nếu có) hoặc 1 đơn vị (nếu không có)
                 // Ví dụ: 35.000 đ/100 Cái, quantity = 2 → 35.000 × 2 = 70.000 đ
@@ -275,37 +277,67 @@ class AgentController extends Controller
             // Update or create items
             foreach ($request->items as $itemData) {
                 $product = Product::findOrFail($itemData['product_id']);
-                $price = $product->wholesale_price ?? $product->price;
+                // Cho phép sửa giá từ request, nếu không có thì dùng giá mặc định từ product
+                $price = isset($itemData['price']) && $itemData['price'] > 0 
+                    ? (float)$itemData['price'] 
+                    : ($product->wholesale_price ?? $product->price);
                 
                 if (isset($itemData['item_id']) && $oldItems->has($itemData['item_id'])) {
                     // Update existing item
                     $item = $oldItems->get($itemData['item_id']);
                     $oldQuantity = $item->quantity;
-                    $oldPrice = $item->price;
+                    $oldPrice = (float)$item->price;
                     $oldProduct = $item->product;
+                    $newQuantity = (int)$itemData['quantity'];
+                    $newPrice = $price;
 
-                    if ($item->quantity != $itemData['quantity'] || $item->price != $price) {
-                        $changes[] = [
-                            'action' => 'update_quantity',
-                            'entity_type' => 'order_item',
-                            'entity_id' => $item->id,
-                            'old_value' => [
-                                'product_id' => $item->product_id,
-                                'product_name' => $oldProduct->name ?? $product->name,
-                                'quantity' => $oldQuantity,
-                                'price' => $oldPrice,
-                            ],
-                            'new_value' => [
-                                'product_id' => $item->product_id,
-                                'product_name' => $product->name,
-                                'quantity' => $itemData['quantity'],
-                                'price' => $price,
-                            ],
-                            'description' => "Cập nhật số lượng sản phẩm {$product->name}: từ {$oldQuantity} thành {$itemData['quantity']}",
-                        ];
+                    // Track changes separately for quantity and price
+                    $quantityChanged = $oldQuantity != $newQuantity;
+                    $priceChanged = abs($oldPrice - $newPrice) > 0.01; // Compare with tolerance for float
 
-                        $item->quantity = $itemData['quantity'];
-                        $item->price = $price;
+                    if ($quantityChanged || $priceChanged) {
+                        // Log quantity change if changed
+                        if ($quantityChanged) {
+                            $changes[] = [
+                                'action' => 'update_quantity',
+                                'entity_type' => 'order_item',
+                                'entity_id' => $item->id,
+                                'old_value' => [
+                                    'product_id' => $item->product_id,
+                                    'product_name' => $oldProduct->name ?? $product->name,
+                                    'quantity' => $oldQuantity,
+                                ],
+                                'new_value' => [
+                                    'product_id' => $item->product_id,
+                                    'product_name' => $product->name,
+                                    'quantity' => $newQuantity,
+                                ],
+                                'description' => "Cập nhật số lượng sản phẩm {$product->name}: từ {$oldQuantity} thành {$newQuantity}",
+                            ];
+                        }
+
+                        // Log price change separately if changed
+                        if ($priceChanged) {
+                            $changes[] = [
+                                'action' => 'update_price',
+                                'entity_type' => 'order_item',
+                                'entity_id' => $item->id,
+                                'old_value' => [
+                                    'product_id' => $item->product_id,
+                                    'product_name' => $oldProduct->name ?? $product->name,
+                                    'price' => $oldPrice,
+                                ],
+                                'new_value' => [
+                                    'product_id' => $item->product_id,
+                                    'product_name' => $product->name,
+                                    'price' => $newPrice,
+                                ],
+                                'description' => "Cập nhật giá sản phẩm {$product->name}: từ " . number_format($oldPrice, 0, ',', '.') . " đ thành " . number_format($newPrice, 0, ',', '.') . " đ",
+                            ];
+                        }
+
+                        $item->quantity = $newQuantity;
+                        $item->price = $newPrice;
                         $item->save();
                     }
                     $oldItems->forget($itemData['item_id']);
@@ -329,7 +361,7 @@ class AgentController extends Controller
                             'quantity' => $newItem->quantity,
                             'price' => $newItem->price,
                         ],
-                        'description' => "Thêm sản phẩm: {$product->name} x {$newItem->quantity}",
+                        'description' => "Thêm sản phẩm: {$product->name} x {$newItem->quantity} với giá " . number_format($newItem->price, 0, ',', '.') . " đ",
                     ];
                 }
             }
@@ -589,7 +621,21 @@ class AgentController extends Controller
             'all_keys' => array_keys($request->all()),
         ]);
 
-        $product = Product::findOrFail($id);
+        $agentId = $request->user()->id;
+        
+        // Đảm bảo chỉ lấy sản phẩm của chính agent đó hoặc sản phẩm chưa có agent_id (null)
+        // Giống getProducts() nhưng cho phép cả agent_id = null (sản phẩm cũ)
+        $product = Product::where(function($q) use ($agentId) {
+            $q->where('agent_id', $agentId)
+              ->orWhereNull('agent_id');
+        })->findOrFail($id);
+        
+        // Log để debug
+        \Log::info('Product found for update', [
+            'product_id' => $product->id,
+            'product_agent_id' => $product->agent_id,
+            'current_agent_id' => $agentId,
+        ]);
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -614,21 +660,25 @@ class AgentController extends Controller
             ], 422);
         }
 
-        \Log::info('Validation passed', []);
+        \Log::info('Validation passed', [
+            'product_id' => $product->id,
+            'product_agent_id' => $product->agent_id,
+            'current_agent_id' => $agentId,
+        ]);
 
         $data = $request->except(['image', '_method', 'agent_id', 'sku']); // Không cho phép sửa SKU
+        
         // Đảm bảo agent_id không bị thay đổi khi update
-        // Chỉ agent tạo sản phẩm mới có thể update
-        $agentId = $request->user()->id;
-        if ($product->agent_id && $product->agent_id !== $agentId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Bạn không có quyền cập nhật sản phẩm này',
-            ], 403);
-        }
         // Nếu sản phẩm chưa có agent_id (sản phẩm cũ), gán agent_id cho agent hiện tại
         if (!$product->agent_id) {
             $data['agent_id'] = $agentId;
+            \Log::info('Product has no agent_id - assigning to current agent', [
+                'product_id' => $product->id,
+                'agent_id' => $agentId,
+            ]);
+        } else {
+            // Đảm bảo agent_id không bị thay đổi (đã kiểm tra ở trên rồi)
+            $data['agent_id'] = $product->agent_id;
         }
         
         // Đảm bảo category_id là của chính agent đó

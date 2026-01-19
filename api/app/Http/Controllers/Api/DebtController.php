@@ -25,7 +25,8 @@ class DebtController extends Controller
             ], 403);
         }
 
-        $query = Debt::with(['orders', 'debtOrders.order', 'agent', 'payments.confirmedBy'])
+        // Chỉ load relationships cần thiết để tăng tốc độ
+        $query = Debt::with(['agent:id,name,phone', 'payments:id,debt_id,amount,payment_date,status'])
             ->where('customer_id', $user->id);
 
         // Filter by status
@@ -33,18 +34,24 @@ class DebtController extends Controller
             $query->where('status', $request->status);
         }
 
-        $debts = $query->orderBy('created_at', 'desc')->get();
-
-        // Calculate statistics
+        // Tính statistics trực tiếp từ database (nhanh hơn nhiều)
+        $statsQuery = Debt::where('customer_id', $user->id);
+        if ($request->has('status') && $request->status) {
+            $statsQuery->where('status', $request->status);
+        }
+        
         $stats = [
-            'total_debts' => $debts->count(),
-            'total_amount' => $debts->sum('total_amount'),
-            'total_paid' => $debts->sum('paid_amount'),
-            'total_remaining' => $debts->sum('remaining_amount'),
-            'pending_count' => $debts->where('status', 'pending')->count(),
-            'partial_count' => $debts->where('status', 'partial')->count(),
-            'paid_count' => $debts->where('status', 'paid')->count(),
+            'total_debts' => $statsQuery->count(),
+            'total_amount' => $statsQuery->sum('total_amount'),
+            'total_paid' => $statsQuery->sum('paid_amount'),
+            'total_remaining' => $statsQuery->sum('remaining_amount'),
+            'pending_count' => (clone $statsQuery)->where('status', 'pending')->count(),
+            'partial_count' => (clone $statsQuery)->where('status', 'partial')->count(),
+            'paid_count' => (clone $statsQuery)->where('status', 'paid')->count(),
         ];
+
+        // Chỉ load debts với relationships tối thiểu (giới hạn 100 records)
+        $debts = $query->orderBy('created_at', 'desc')->limit(100)->get();
 
         return response()->json([
             'success' => true,
@@ -65,7 +72,8 @@ class DebtController extends Controller
             ], 403);
         }
 
-        $query = Debt::with(['orders', 'debtOrders.order', 'customer', 'payments.confirmedBy'])
+        // Chỉ load relationships cần thiết để tăng tốc độ
+        $query = Debt::with(['customer:id,name,phone', 'payments:id,debt_id,amount,payment_date,status'])
             ->where('agent_id', $request->user()->id);
 
         // Filter by status
@@ -78,18 +86,27 @@ class DebtController extends Controller
             $query->where('customer_id', $request->customer_id);
         }
 
-        $debts = $query->orderBy('created_at', 'desc')->get();
-
-        // Calculate statistics
+        // Tính statistics trực tiếp từ database (nhanh hơn nhiều)
+        $statsQuery = Debt::where('agent_id', $request->user()->id);
+        if ($request->has('status') && $request->status) {
+            $statsQuery->where('status', $request->status);
+        }
+        if ($request->has('customer_id') && $request->customer_id) {
+            $statsQuery->where('customer_id', $request->customer_id);
+        }
+        
         $stats = [
-            'total_debts' => $debts->count(),
-            'total_amount' => $debts->sum('total_amount'),
-            'total_paid' => $debts->sum('paid_amount'),
-            'total_remaining' => $debts->sum('remaining_amount'),
-            'pending_count' => $debts->where('status', 'pending')->count(),
-            'partial_count' => $debts->where('status', 'partial')->count(),
-            'paid_count' => $debts->where('status', 'paid')->count(),
+            'total_debts' => $statsQuery->count(),
+            'total_amount' => $statsQuery->sum('total_amount'),
+            'total_paid' => $statsQuery->sum('paid_amount'),
+            'total_remaining' => $statsQuery->sum('remaining_amount'),
+            'pending_count' => (clone $statsQuery)->where('status', 'pending')->count(),
+            'partial_count' => (clone $statsQuery)->where('status', 'partial')->count(),
+            'paid_count' => (clone $statsQuery)->where('status', 'paid')->count(),
         ];
+
+        // Chỉ load debts với relationships tối thiểu (giới hạn 100 records)
+        $debts = $query->orderBy('created_at', 'desc')->limit(100)->get();
 
         return response()->json([
             'success' => true,
