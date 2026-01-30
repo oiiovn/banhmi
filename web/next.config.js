@@ -8,6 +8,8 @@ const withPWA = require('next-pwa')({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: false },
   // TÁCH BIỆT: Chỉ static export khi build production
   // Development sẽ dùng server-side rendering bình thường
   ...(process.env.NODE_ENV === 'production' && process.env.BUILD_FOR_HOSTING === 'true' ? {

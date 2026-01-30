@@ -376,6 +376,8 @@ export interface Debt {
   orders?: Order[] // For consolidated debt (multiple orders)
   debtOrders?: DebtOrder[] // Pivot table records with order details
   debt_orders?: DebtOrder[] // Backend returns snake_case
+  debtManualEntries?: DebtManualEntry[]
+  debt_manual_entries?: DebtManualEntry[]
   customer?: {
     id: number
     name: string
@@ -426,6 +428,34 @@ export interface DebtTransfer {
   // Permission flags
   needs_my_confirmation: boolean
   is_initiator: boolean
+}
+
+export interface DebtManualEntry {
+  id: number
+  debt_id: number
+  amount: string
+  notes: string | null
+  created_at: string
+  created_by: number
+  createdBy?: { id: number; name: string }
+}
+
+export interface DebtManualRequest {
+  id: number
+  customer_id: number
+  agent_id: number
+  amount: string
+  notes: string
+  status: 'pending' | 'confirmed' | 'rejected'
+  created_by: number
+  confirmed_by: number | null
+  confirmed_at: string | null
+  rejected_at: string | null
+  created_at: string
+  updated_at: string
+  agent?: { id: number; name: string; phone: string | null }
+  customer?: { id: number; name: string; phone: string | null }
+  createdBy?: { id: number; name: string }
 }
 
 export interface Payment {

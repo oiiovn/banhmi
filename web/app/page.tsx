@@ -29,6 +29,7 @@ interface Product {
   image: string | null
   category_id: number
   is_available: boolean
+  total_sold?: number
   agent?: {
     id: number
     name: string
@@ -370,9 +371,9 @@ export default function Home() {
       </section>
 
       {/* Products */}
-      <section className="container mx-auto px-2 pb-20 md:pb-16">
+      <section className="container mx-auto px-2 pb-20 md:pb-16 bg-gray-50/50 md:bg-transparent md:pt-0 pt-2">
         <div className="flex justify-between items-center mb-3 md:mb-4">
-          <h3 className="text-lg md:text-2xl font-bold">Sản phẩm</h3>
+          <h3 className="text-lg md:text-2xl font-bold text-gray-900">Sản phẩm</h3>
           {selectedCategory && (
             <button
               onClick={() => handleCategoryClick(null)}
@@ -392,18 +393,18 @@ export default function Home() {
             <p className="text-gray-500 text-sm md:text-lg">Không có sản phẩm nào trong danh mục này</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2 md:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 md:gap-4">
             {products.map((product) => (
               <div
                 key={product.id}
-                className="bg-white rounded-md shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 transform hover:-translate-y-0.5 flex flex-col h-full"
+                className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-lg hover:border-primary-200 transition-all duration-300 transform hover:-translate-y-0.5 flex flex-col h-full"
               >
-                <div className="relative w-full aspect-square bg-gray-100 flex-shrink-0 overflow-hidden">
+                <div className="relative w-full aspect-square bg-gray-50 flex-shrink-0 overflow-hidden rounded-t-xl">
                   {getImageUrl(product.image) ? (
                     <img
                       src={getImageUrl(product.image)!}
                       alt={product.name}
-                      className="w-full h-full object-cover rounded-t-md"
+                      className="w-full h-full object-cover rounded-t-xl"
                       style={{ aspectRatio: '1 / 1', objectFit: 'cover' }}
                       loading="lazy"
                       onError={(e) => {
@@ -414,9 +415,6 @@ export default function Home() {
                           productName: product.name,
                           productId: product.id
                         })
-                        // Không ẩn ảnh, chỉ log lỗi để debug
-                        // img.style.display = 'none'
-                        // img.nextElementSibling?.classList.remove('hidden')
                       }}
                       onLoad={() => {
                         if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
@@ -428,38 +426,38 @@ export default function Home() {
                       }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400 rounded-t-md">
-                      <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-full h-full flex items-center justify-center text-gray-300 rounded-t-xl bg-gray-100">
+                      <svg className="w-8 h-8 md:w-10 md:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          strokeWidth={2}
+                          strokeWidth={1.5}
                           d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                         />
                       </svg>
                     </div>
                   )}
                   {!product.is_available && (
-                    <div className="absolute top-0.5 right-0.5 bg-red-500 text-white px-1 py-0.5 rounded text-[9px] md:text-[10px] font-medium">
+                    <div className="absolute top-1 right-1 bg-red-500 text-white px-1.5 py-0.5 rounded-md text-[10px] font-semibold shadow">
                       Hết
                     </div>
                   )}
                 </div>
-                <div className="p-1 md:p-1.5 flex flex-col flex-grow">
-                  <h4 className="font-medium text-[11px] md:text-xs mb-0.5 text-gray-900 line-clamp-1 leading-tight">{product.name}</h4>
+                <div className="p-2 md:p-3 flex flex-col flex-grow border-t border-gray-100 bg-white">
+                  <h4 className="font-semibold text-xs md:text-sm mb-1 text-gray-900 line-clamp-2 leading-tight">{product.name}</h4>
                   {product.agent && (
-                    <p className="text-blue-600 text-[8px] md:text-[9px] mb-0.5 font-medium line-clamp-1">
+                    <p className="text-primary-600 text-[10px] md:text-xs mb-1 font-medium line-clamp-1">
                       Đại lý: {product.agent.name}
                     </p>
                   )}
                   {product.description && (
-                    <p className="text-gray-600 text-[9px] md:text-[10px] mb-1 line-clamp-2 flex-grow leading-tight">
+                    <p className="text-gray-500 text-[10px] md:text-xs mb-2 line-clamp-2 flex-grow leading-snug">
                       {product.description}
                     </p>
                   )}
-                  <div className="flex justify-between items-center mt-auto gap-1">
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-primary-600 font-bold text-[11px] md:text-xs truncate">
+                  <div className="mt-auto space-y-1">
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      <span className="text-primary-600 font-bold text-sm md:text-base">
                         {product.wholesale_price
                           ? parseFloat(product.wholesale_price).toLocaleString('vi-VN') + ' đ'
                           : product.price
@@ -467,38 +465,40 @@ export default function Home() {
                           : 'Liên hệ'}
                       </span>
                       {product.unit && (
-                        <span className="text-gray-500 text-[9px] md:text-[10px] truncate">
-                          {product.quantity_per_unit && parseFloat(product.quantity_per_unit) > 0
+                        <span className="text-gray-400 text-[10px] md:text-xs">
+                          / {product.quantity_per_unit && parseFloat(product.quantity_per_unit) > 0
                             ? `${parseFloat(product.quantity_per_unit)} ${product.unit}`
                             : product.unit}
                         </span>
                       )}
                     </div>
-                    <button
-                      onClick={() => handleAddToCart(product)}
-                      disabled={!product.is_available}
-                      className={`px-1.5 py-1 md:px-2 md:py-1.5 rounded text-[9px] md:text-[10px] font-medium transition flex-shrink-0 ${
-                        product.is_available
-                          ? 'bg-primary-600 text-white hover:bg-primary-700 active:scale-95'
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
-                    >
-                      {product.is_available ? (
-                        <span className="flex items-center gap-0.5">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500 text-[10px] md:text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                        Đã bán: {Number(product.total_sold) || 0}
+                      </span>
+                      <button
+                        onClick={() => handleAddToCart(product)}
+                        disabled={!product.is_available}
+                        className={`flex-shrink-0 p-1.5 md:p-2 rounded-lg transition ${
+                          product.is_available
+                            ? 'bg-primary-600 text-white hover:bg-primary-700 active:scale-95 shadow-sm'
+                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        {product.is_available ? (
+                          <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
                               strokeWidth={2}
-                              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                              d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
                             />
                           </svg>
-                          <span className="hidden sm:inline">Thêm</span>
-                        </span>
-                      ) : (
-                        'Hết'
-                      )}
-                    </button>
+                        ) : (
+                          <span className="text-[10px] font-medium">Hết</span>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

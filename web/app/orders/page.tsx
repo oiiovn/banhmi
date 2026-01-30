@@ -600,6 +600,9 @@ export default function OrdersPage() {
                         </span>
                     </div>
                     <p className="text-[11px] text-gray-500 mb-1">{formatDate(order.created_at)}</p>
+                    {order.agent && (
+                      <p className="text-[11px] text-primary-600 font-medium mb-0.5">Đại lý: {order.agent.name}</p>
+                    )}
                     <p className="text-xs text-gray-600 line-clamp-1">
                       {order.items.map((item) => item.product.name).join(', ')}
                     </p>

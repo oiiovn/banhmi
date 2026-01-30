@@ -180,6 +180,12 @@ export const getImageUrl = (imagePath: string | null | undefined): string | null
         return imagePath
       }
       
+      // Nếu đang ở LOCAL mà DB trả URL production → GIỮ NGUYÊN URL để ảnh load từ server production
+      // (tránh 404 vì file ảnh thường không có trên máy local khi DB copy từ production)
+      if (isLocal && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
+        return imagePath
+      }
+      
       // Nếu đang ở PRODUCTION
       if (!isLocal) {
         // Nếu URL là localhost → THAY THẾ bằng production URL
